@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  maui-bot:
+  maui:
     build: .
     image: dvilela/maui
     container_name: maui

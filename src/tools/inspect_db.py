@@ -1,5 +1,14 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Label, Button, Input, TabbedContent, TabPane
+from textual.widgets import (
+    Header,
+    Footer,
+    DataTable,
+    Label,
+    Button,
+    Input,
+    TabbedContent,
+    TabPane,
+)
 from textual.containers import Container
 from textual.screen import ModalScreen
 from rich.text import Text
@@ -83,8 +92,6 @@ class EditUserModal(ModalScreen):
             self.dismiss()
 
         elif event.button.id == "whitelist":
-
-
             status = UserStatus.WHITELISTED
             user.status = status
             user.save()
@@ -92,8 +99,6 @@ class EditUserModal(ModalScreen):
             self.app.notify(f"User {self.user_id} Whitelisted")
             self.dismiss()
         elif event.button.id == "blacklist":
-
-
             status = UserStatus.BLACKLISTED
             user.status = status
             user.save()

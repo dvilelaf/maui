@@ -59,11 +59,15 @@ class TaskManager:
         # For simplicity and robustness with SQLite/Peewee:
         from peewee import fn
 
-        existing = Task.select().where(
-            (Task.user == user_id)
-            & (Task.status == TaskStatus.PENDING)
-            & (fn.Lower(Task.title) == task_data.title.lower())
-        ).first()
+        existing = (
+            Task.select()
+            .where(
+                (Task.user == user_id)
+                & (Task.status == TaskStatus.PENDING)
+                & (fn.Lower(Task.title) == task_data.title.lower())
+            )
+            .first()
+        )
 
         if existing:
             return None
@@ -115,7 +119,7 @@ class TaskManager:
             query &= Task.deadline <= end_of_year
 
         if priority_filter:
-            query &= (Task.priority == priority_filter)
+            query &= Task.priority == priority_filter
 
         tasks = list(Task.select().where(query))
 

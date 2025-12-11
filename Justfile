@@ -21,7 +21,7 @@ restart: down up
 
 # Push the Docker image
 push:
-    docker compose push
+    docker push dvilela/maui
 
 # Build and push
 ship: format check build push

@@ -67,7 +67,7 @@ class Coordinator:
             new_task = self.task_manager.add_task(user_id, extraction.formatted_task)
 
             if not new_task:
-                 return f"⚠️ Ya tienes una tarea pendiente con ese nombre: *{extraction.formatted_task.title}*."
+                return f"⚠️ Ya tienes una tarea pendiente con ese nombre: *{extraction.formatted_task.title}*."
 
             deadline_str = (
                 f" para {format_datetime_es(new_task.deadline)}"
@@ -141,19 +141,28 @@ class Coordinator:
                 changes = []
 
                 if "title" in updates and updates["title"] != target_task.title:
-                    changes.append(f"📝 Título: {target_task.title} -> {updates['title']}")
-
-                if "description" in updates and updates["description"] != target_task.description:
-                    changes.append("📄 Descripción actualizada")
+                    changes.append(
+                        f"📝 Título: {target_task.title} -> {updates['title']}"
+                    )
 
                 if (
-                    "status" in updates
-                    and updates["status"] != target_task.status
+                    "description" in updates
+                    and updates["description"] != target_task.description
                 ):
-                    changes.append(f"📊 Estado: {target_task.status} -> {updates['status']}")
+                    changes.append("📄 Descripción actualizada")
 
-                if "priority" in updates and updates["priority"] != target_task.priority:
-                     changes.append(f"🚨 Prioridad: {target_task.priority} -> {updates['priority']}")
+                if "status" in updates and updates["status"] != target_task.status:
+                    changes.append(
+                        f"📊 Estado: {target_task.status} -> {updates['status']}"
+                    )
+
+                if (
+                    "priority" in updates
+                    and updates["priority"] != target_task.priority
+                ):
+                    changes.append(
+                        f"🚨 Prioridad: {target_task.priority} -> {updates['priority']}"
+                    )
 
                 if "deadline" in updates:
                     # Compare datetimes safely
@@ -163,8 +172,13 @@ class Coordinator:
                     # If both are None, no change. If one is None, change. If values differ, change.
                     if old_dead != new_dead:
                         from src.utils.formatters import format_datetime_es
-                        old_str = format_datetime_es(old_dead) if old_dead else "Sin fecha"
-                        new_str = format_datetime_es(new_dead) if new_dead else "Sin fecha"
+
+                        old_str = (
+                            format_datetime_es(old_dead) if old_dead else "Sin fecha"
+                        )
+                        new_str = (
+                            format_datetime_es(new_dead) if new_dead else "Sin fecha"
+                        )
                         changes.append(f"📅 Fecha: {old_str} -> {new_str}")
 
                 success = self.task_manager.edit_task(

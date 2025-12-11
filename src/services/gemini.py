@@ -200,7 +200,6 @@ class GeminiService:
                     # We try all keys for the CURRENT model before giving up on the model
                     keys_tried = 0
 
-
                     while keys_tried < len(self.api_keys) - 1:  # Try other keys
                         self._rotate_key()
                         keys_tried += 1
