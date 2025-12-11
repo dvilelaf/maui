@@ -38,19 +38,39 @@ class GeminiService:
 
         If UNKNOWN, provide reasoning in Spanish.
 
-        Current Timestamp: {current_time}
+        Current Context:
+        - Today's Date: {current_time}
+        - Day of Week: {day_name}
+
+        CRITICAL INSTRUCTION FOR DATES:
+        - Interpretation: deeply analyze terms like "today" (hoy), "tomorrow" (mañana), "next Friday" (el próximo viernes).
+        - Calculation: Calculate the exact ISO 8601 string based on "Today's Date".
+        - Time:
+            - If user mentions a date w/o time (e.g. "for today"), set time to 23:59:59.
+            - "Today" = {today_date}T23:59:59
+            - "Tomorrow" = {tomorrow_date}T23:59:59
         """
 
     def process_input(self, user_input: Union[str, bytes], mime_type: str = "text/plain") -> TaskExtractionResponse:
         """
         Process text or audio input to extract task details.
         """
-        from datetime import datetime
+        from datetime import datetime, timedelta
         import time
         from google.api_core.exceptions import InternalServerError, ServiceUnavailable, ResourceExhausted
 
-        current_time = datetime.now().isoformat()
-        system_instruction = self._get_system_prompt().format(current_time=current_time)
+        now = datetime.now()
+        current_time = now.isoformat()
+        day_name = now.strftime("%A")
+        today_date = now.strftime("%Y-%m-%d")
+        tomorrow_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
+        system_instruction = self._get_system_prompt().format(
+            current_time=current_time,
+            day_name=day_name,
+            today_date=today_date,
+            tomorrow_date=tomorrow_date
+        )
 
         max_retries = 3
         # Use models from config, defaulting to single model if list missing

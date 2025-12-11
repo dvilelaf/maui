@@ -15,11 +15,13 @@ class UserIntent(str, Enum):
 class TaskSchema(BaseModel):
     title: Optional[str] = Field(None, description="The short summary or title of the task")
     description: Optional[str] = Field(None, description="Detailed description of the task, if any")
-    priority: str = Field("MEDIUM", description="Task priority: LOW, MEDIUM, HIGH, URGENT")
+    priority: Optional[str] = Field("MEDIUM", description="Task priority: LOW, MEDIUM, HIGH, URGENT")
     deadline: Optional[datetime] = Field(None, description="The deadline for the task, if explicitly mentioned or inferred.")
 
     @field_validator('priority')
     def validate_priority(cls, v):
+        if v is None:
+            return 'MEDIUM'
         if v.upper() not in ('LOW', 'MEDIUM', 'HIGH', 'URGENT'):
             return 'MEDIUM'
         return v.upper()

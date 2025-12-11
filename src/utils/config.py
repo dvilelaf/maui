@@ -9,8 +9,6 @@ class Config:
     GEMINI_MODELS = [
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
-        "gemma-3-27b-it",
-        "gemma-3-12b-it"
     ]
     DATABASE_URL = os.getenv("DATABASE_URL", "maui.db")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
