@@ -98,7 +98,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def list_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    summary = coordinator.get_weekly_summary(user.id)
+    summary = coordinator.get_task_summary(user.id)
     await update.message.reply_markdown(summary)
 
 
