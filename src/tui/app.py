@@ -25,8 +25,6 @@ logger = logging.getLogger("inspect_db")
 HIGHLIGHT_DURATION = 5.0
 
 
-
-
 class DatabaseMonitor(App):
     CSS = """
     Screen {
@@ -96,12 +94,12 @@ class DatabaseMonitor(App):
         # Auto-select first row
         table_id = f"#{tab_id.replace('_tab', '')}_table"
         try:
-             table = self.query_one(table_id, DataTable)
-             table.focus()
-             if table.row_count > 0:
-                 table.move_cursor(row=0)
+            table = self.query_one(table_id, DataTable)
+            table.focus()
+            if table.row_count > 0:
+                table.move_cursor(row=0)
         except Exception:
-             pass
+            pass
 
     def action_delete(self) -> None:
         """Trigger deletion of the selected item."""
@@ -154,7 +152,9 @@ class DatabaseMonitor(App):
         try:
             if "users" in active_tab:
                 u = User.get_by_id(item_id)
-                item_name = f"{u.first_name} ({u.username})" if u.username else u.first_name
+                item_name = (
+                    f"{u.first_name} ({u.username})" if u.username else u.first_name
+                )
             elif "tasks" in active_tab:
                 t = Task.get_by_id(item_id)
                 item_name = f"'{t.title}'"
@@ -253,7 +253,6 @@ class DatabaseMonitor(App):
     def action_quit(self) -> None:
         self.exit()
 
-
     def perform_delete(self, confirmed: bool, tab_name: str, item_id: int):
         if not confirmed:
             return
@@ -281,9 +280,7 @@ class DatabaseMonitor(App):
                 # Delete list (and maybe shared access?)
                 TaskList.delete().where(TaskList.id == item_id).execute()
                 # SharedAccess should cascade if DB configured, or manual:
-                SharedAccess.delete().where(
-                    SharedAccess.task_list == item_id
-                ).execute()
+                SharedAccess.delete().where(SharedAccess.task_list == item_id).execute()
                 # Tasks in list?
                 # Set their list_id to NULL or delete?
                 # Ideally set to null.
@@ -329,8 +326,6 @@ class DatabaseMonitor(App):
         lists_table = self.query_one("#lists_table", DataTable)
         lists_table.cursor_type = "row"
         lists_table.add_columns("ID", "Title", "Owner", "Members", "Tasks")
-
-        tasks_table.add_columns("ID", "User", "Title", "Deadline", "Priority", "Status")
 
         # Start Polling
         self.refresh_data()
@@ -458,8 +453,10 @@ class DatabaseMonitor(App):
                 )
                 member_names = [u.username or u.first_name for u in members]
 
-                # Get tasks
-                tasks = Task.select().where(Task.task_list == task_list.id)
+                # Get tasks - Force execute to ensure no cache
+                tasks = list(
+                    Task.select().where(Task.task_list == task_list.id).execute()
+                )
                 task_summary = ", ".join([t.title for t in tasks])
 
                 current_data[task_list.id] = {
@@ -473,22 +470,31 @@ class DatabaseMonitor(App):
             return
 
         self._update_table(
-            table, "lists", current_data, ["ID", "Title", "Owner", "Members", "Tasks"]
+            table,
+            "lists",
+            current_data,
+            ["ID", "Title", "Owner", "Members", "Tasks"],
+            rebuild=True,
         )
 
     def _update_table(
-        self, table: DataTable, table_name: str, current_data: dict, columns: list
+        self,
+        table: DataTable,
+        table_name: str,
+        current_data: dict,
+        columns: list,
+        rebuild: bool = False,
     ):
         """
-        Generic update logic with diffing and highlighting.
+        Generic update logic.
+        Args:
+            rebuild: If True, clears and repopulates table on changes to force column resize.
         """
         cache = self.data_cache[table_name]
         highlights = self.highlights[table_name]
         now = time.time()
 
         # 1. Update Columns/Rows logic
-        # Textual DataTable manages rows by Key. We can use ID as key.
-
         # Check for deleted rows
         cached_ids = set(cache.keys())
         current_ids = set(current_data.keys())
@@ -501,31 +507,23 @@ class DatabaseMonitor(App):
                 del highlights[deleted_id]
 
         # Check for new or updated rows
+        any_changes = False
+
+        # First pass: Diffing and Highlighting Update
         for row_id, new_row in current_data.items():
             str_id = str(row_id)
 
-            # --- HIGHLIGHT LOGIC ---
-            # Detect changes field by field
             if row_id not in cache:
                 # NEW ROW
                 cache[row_id] = new_row
-                # Init highlights for all fields
                 ts = 0 if self.is_first_refresh else now
                 highlights[row_id] = {col: ts for col in columns}
-                # Add row
-                # Initially highlighted only if NOT first refresh
-                is_initially_highlighted = not self.is_first_refresh
-                rendered_cells = [
-                    self._render_cell(new_row[col], is_initially_highlighted)
-                    for col in columns
-                ]
-                table.add_row(*rendered_cells, key=str_id)
+                any_changes = True
             else:
-                # EXISTING ROW
+                # EXISTING LOW
                 old_row = cache[row_id]
                 changes_found = False
 
-                # Update highlights timestamp if changed
                 if row_id not in highlights:
                     highlights[row_id] = {}
 
@@ -534,67 +532,121 @@ class DatabaseMonitor(App):
                         highlights[row_id][col] = now
                         changes_found = True
 
-                # Retrieve timestamps
-                row_highlights = highlights[row_id]
+                if changes_found:
+                    any_changes = True
+                    cache[row_id] = new_row
 
-                # Check if we need to redraw row cells
-                # We redraw if data changed OR if highlight expired (to clear style)
-                # It's expensive to update every second if nothing changed.
-                # But we need to "un-highlight" after 5 seconds.
+        # Second Pass: Rendering
+        if rebuild and any_changes:
+            # Full Rebuild approach (for Lists table column resize issue)
+            # Save cursor
+            cursor_row_index = table.cursor_row
 
-                # Logic: Is any field currently highlighted?
-                # If yes, we must refresh that cell to see if it should expire.
-                # If val changed, we must refresh.
+            table.clear(columns=False)
 
-                should_refresh_row = changes_found
+            for row_id, new_row in current_data.items():
+                str_id = str(row_id)
+                # Determine highlighting
+                row_highlights = highlights.get(row_id, {})
 
-                # Also check expirations
-                for col, ts in list(row_highlights.items()):
-                    if now - ts <= HIGHLIGHT_DURATION:
-                        should_refresh_row = True  # It is highlighted, so we keep refreshing to eventually catch expiration?
-                        # Actually, we rely on polling.
-                    else:
-                        # Expired. If it was just expired, we need one last refresh to clear it.
-                        # We can just remove it from dict?
-                        # Only if we know it was previously highlighted.
-                        # Simple approach: Always update cell if it is in highlights dict.
-                        # If it expires, remove from dict.
-                        should_refresh_row = True
-                        del row_highlights[col]
+                rendered_cells = []
+                for col in columns:
+                    # Check highlight
+                    ts = row_highlights.get(col, 0)
+                    is_highlighted = now - ts <= HIGHLIGHT_DURATION
 
-                if should_refresh_row:
-                    column_keys = list(table.columns.keys())
+                    val = new_row[col]
+                    # Apply status formatting if needed (duplicated logic, could be refactored)
+                    val = self._format_status(table_name, col, val)
 
-                    for i, col in enumerate(columns):
-                        ts = row_highlights.get(col, 0)
-                        is_highlighted = now - ts <= HIGHLIGHT_DURATION
+                    rendered_cells.append(self._render_cell(val, is_highlighted))
 
-                        val = new_row[col]
-                        # Special formatting for Status if tasks or users
-                        if col == "Status":
-                            if table_name == "tasks":
-                                status_style = (
-                                    "green"
-                                    if val == TaskStatus.COMPLETED
-                                    else "yellow"
-                                    if val == TaskStatus.PENDING
-                                    else "dim"
-                                )
-                                val = f"[{status_style}]{val}[/{status_style}]"
-                            elif table_name == "users":
-                                status_style = (
-                                    "green"
-                                    if val == UserStatus.WHITELISTED
-                                    else "red"
-                                    if val == UserStatus.BLACKLISTED
-                                    else "yellow"
-                                )
-                                val = f"[{status_style}]{val}[/{status_style}]"
+                table.add_row(*rendered_cells, key=str_id)
 
-                        rendered = self._render_cell(val, is_highlighted)
-                        table.update_cell(str_id, column_keys[i], rendered)
+            # Restore cursor
+            if cursor_row_index < table.row_count:
+                table.move_cursor(row=cursor_row_index)
+            elif table.row_count > 0:
+                table.move_cursor(row=table.row_count - 1)
 
-                cache[row_id] = new_row
+        else:
+            # Incremental Update (Original Logic)
+            for row_id, new_row in current_data.items():
+                str_id = str(row_id)
+
+                # We need to verify if row exists in table.
+                # If "NEW ROW" detected above, it won't be in table unless we added it?
+                # Ah, my previous diffing loop didn't add rows!
+                # I need to handle adding new rows here if not rebuild.
+
+                row_exists = False
+                try:
+                    if table.get_row_index(str_id) >= 0:
+                        row_exists = True
+                except Exception:
+                    pass
+
+                if not row_exists:
+                    # Add it
+                    row_highlights = highlights.get(row_id, {})
+                    is_initially_highlighted = not self.is_first_refresh
+
+                    rendered_cells = []
+                    for col in columns:
+                        val = self._format_status(table_name, col, new_row[col])
+                        rendered_cells.append(
+                            self._render_cell(val, is_initially_highlighted)
+                        )
+
+                    table.add_row(*rendered_cells, key=str_id)
+                else:
+                    # Update Existing
+                    row_highlights = highlights.get(row_id, {})
+                    should_refresh_row = False
+
+                    # Logic: changed or expired?
+                    # Simply check highlighting timestamps
+                    for col, ts in list(row_highlights.items()):
+                        if now - ts <= HIGHLIGHT_DURATION:
+                            should_refresh_row = True
+                        else:
+                            # Expired, refresh to clear
+                            should_refresh_row = True
+                            del row_highlights[col]
+
+                    if should_refresh_row:
+                        column_keys = list(table.columns.keys())
+                        for i, col in enumerate(columns):
+                            ts = row_highlights.get(col, 0)
+                            is_highlighted = now - ts <= HIGHLIGHT_DURATION
+                            val = self._format_status(table_name, col, new_row[col])
+                            rendered = self._render_cell(val, is_highlighted)
+                            table.update_cell(str_id, column_keys[i], rendered)
+
+        # Force a layout refresh anyway
+        # table.refresh()
+
+    def _format_status(self, table_name, col, val):
+        if col == "Status":
+            if table_name == "tasks":
+                status_style = (
+                    "green"
+                    if val == TaskStatus.COMPLETED
+                    else "yellow"
+                    if val == TaskStatus.PENDING
+                    else "dim"
+                )
+                return f"[{status_style}]{val}[/{status_style}]"
+            elif table_name == "users":
+                status_style = (
+                    "green"
+                    if val == UserStatus.WHITELISTED
+                    else "red"
+                    if val == UserStatus.BLACKLISTED
+                    else "yellow"
+                )
+                return f"[{status_style}]{val}[/{status_style}]"
+        return val
 
     def _render_cell(self, value: str, highlighted: bool) -> Text:
         """Helper to style a cell."""

@@ -97,7 +97,9 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_markdown(response)
     except Exception as e:
         logger.error(f"Error handling voice message: {e}")
-        await update.message.reply_text("Lo siento, hubo un error al procesar tu audio. Por favor intenta de nuevo.")
+        await update.message.reply_text(
+            "Lo siento, hubo un error al procesar tu audio. Por favor intenta de nuevo."
+        )
 
 
 async def get_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

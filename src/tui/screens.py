@@ -41,7 +41,6 @@ class EditUserModal(ModalScreen):
         self.user_id = user_id
 
     def compose(self) -> ComposeResult:
-
         user = User.get_or_none(User.telegram_id == self.user_id)
 
         username = user.username if user and user.username else ""
@@ -64,7 +63,6 @@ class EditUserModal(ModalScreen):
             yield Button("Cancel", id="cancel", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-
         user = User.get_or_none(User.telegram_id == self.user_id)
         if not user:
             self.dismiss()
@@ -128,7 +126,6 @@ class EditTaskModal(ModalScreen):
         self.task_id = task_id
 
     def compose(self) -> ComposeResult:
-
         task = Task.get_or_none(Task.id == self.task_id)
 
         title = task.title if task else ""
@@ -238,7 +235,13 @@ class ListDetailModal(ModalScreen):
 class ConfirmScreen(ModalScreen[bool]):
     """A modal dialog to confirm an action."""
 
-    def __init__(self, message: str, name: str | None = None, id: str | None = None, classes: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+    ):
         super().__init__(name=name, id=id, classes=classes)
         self.message = message
 
@@ -255,9 +258,9 @@ class ConfirmScreen(ModalScreen[bool]):
         # Explicitly toggle focus between buttons
         current = self.focused
         if current and current.id == "confirm":
-             self.query_one("#cancel", Button).focus()
+            self.query_one("#cancel", Button).focus()
         else:
-             self.query_one("#confirm", Button).focus()
+            self.query_one("#confirm", Button).focus()
 
     def compose(self) -> ComposeResult:
         with Container(classes="modal"):
@@ -271,5 +274,3 @@ class ConfirmScreen(ModalScreen[bool]):
             self.dismiss(True)
         else:
             self.dismiss(False)
-
-

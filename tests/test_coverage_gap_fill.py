@@ -71,6 +71,8 @@ async def test_update_table_highlight_logic(mocker):
 
     table = MagicMock()
     table.columns.keys.return_value = ["Col1"]
+    # Ensure get_row_index succeeds for "existing" checks
+    table.get_row_index.return_value = 0
 
     app.data_cache["test"] = {}
     app.highlights["test"] = {}

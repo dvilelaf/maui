@@ -15,6 +15,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+
 async def notify_user(user_id: int, message: str):
     """Sends a notification to the user."""
     try:
@@ -41,6 +42,7 @@ def confirm_action(prompt: str) -> bool:
     resp = input(f"{prompt} (y/n): ").strip().lower()
     return resp == "y"
 
+
 def kick_user(user_id: int):
     """Deletes a user and their tasks after confirmation."""
     try:
@@ -48,16 +50,23 @@ def kick_user(user_id: int):
         if not user:
             print(f"User {user_id} not found.")
             return
-        if not confirm_action(f"Are you sure you want to delete user {user_id} and all their tasks?"):
+        if not confirm_action(
+            f"Are you sure you want to delete user {user_id} and all their tasks?"
+        ):
             print("Deletion cancelled.")
             return
         # from src.database.models import Task # Already imported above
         task_count = Task.delete().where(Task.user == user.telegram_id).execute()
         user.delete_instance()
-        logger.warning(f"User KICKED (Deleted): {user.telegram_id} and {task_count} tasks.")
-        print(f"✅ User {user.telegram_id} (@{user.username}) and their {task_count} tasks have been deleted.")
+        logger.warning(
+            f"User KICKED (Deleted): {user.telegram_id} and {task_count} tasks."
+        )
+        print(
+            f"✅ User {user.telegram_id} (@{user.username}) and their {task_count} tasks have been deleted."
+        )
     except Exception as e:
         print(f"Error kicking user {user_id}: {e}")
+
 
 def update_status(user: User, status: UserStatus):
     try:
@@ -287,18 +296,18 @@ class TaskManager:
         return Task.update(**updates).where(Task.id == task_id).execute() > 0
 
     @staticmethod
-    def find_tasks_by_keyword(user_id: int, keyword: str) -> List[Task]:
-        return list(
-            Task.select().where(
-                (Task.user == user_id)
-                & (Task.status == TaskStatus.PENDING)
-                & (Task.task_list.is_null())
-                & (
-                    (Task.title.contains(keyword))
-                    | (Task.description.contains(keyword))
-                )
-            )
-        )
+    def find_tasks_by_keyword(
+        user_id: int, keyword: str, list_id: int = None
+    ) -> List[Task]:
+        query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
+
+        if list_id:
+            query &= Task.task_list == list_id
+        else:
+            query &= Task.task_list.is_null()
+
+        query &= (Task.title.contains(keyword)) | (Task.description.contains(keyword))
+        return list(Task.select().where(query))
 
     @staticmethod
     def create_list(user_id: int, title: str) -> TaskList:
@@ -317,22 +326,31 @@ class TaskManager:
 
         # 2. If not found, Fuzzy Search
         if not target_user:
-            candidates = list(User.select().where(
-                (fn.Lower(User.first_name).contains(query_str.lower())) |
-                (fn.Lower(User.last_name).contains(query_str.lower())) |
-                (fn.Lower(User.username).contains(query_str.lower()))
-            ))
+            candidates = list(
+                User.select().where(
+                    (fn.Lower(User.first_name).contains(query_str.lower()))
+                    | (fn.Lower(User.last_name).contains(query_str.lower()))
+                    | (fn.Lower(User.username).contains(query_str.lower()))
+                )
+            )
 
             if len(candidates) == 0:
                 return False, f"Usuario '{target_query}' no encontrado."
 
             if len(candidates) > 1:
                 # Try to refine: check exact First Name match
-                exact_name = [u for u in candidates if u.first_name and u.first_name.lower() == query_str.lower()]
+                exact_name = [
+                    u
+                    for u in candidates
+                    if u.first_name and u.first_name.lower() == query_str.lower()
+                ]
                 if len(exact_name) == 1:
                     target_user = exact_name[0]
                 else:
-                    names = [f"{u.first_name} {u.last_name or ''} (@{u.username or '-'})" for u in candidates[:3]]
+                    names = [
+                        f"{u.first_name} {u.last_name or ''} (@{u.username or '-'})"
+                        for u in candidates[:3]
+                    ]
                     msg = ", ".join(names)
                     if len(candidates) > 3:
                         msg += "..."
@@ -342,7 +360,7 @@ class TaskManager:
                 target_user = candidates[0]
 
         if not target_user:
-             return False, f"Usuario '{target_query}' no encontrado."
+            return False, f"Usuario '{target_query}' no encontrado."
 
         # Check if already shared
         exists = (
@@ -353,14 +371,20 @@ class TaskManager:
             .exists()
         )
         if exists:
-            return False, f"La lista ya está compartida con @{target_user.username or target_user.first_name}."
+            return (
+                False,
+                f"La lista ya está compartida con @{target_user.username or target_user.first_name}.",
+            )
 
         SharedAccess.create(
             user=target_user,
             task_list=list_id,
             status="ACCEPTED",  # Auto-accept for now to simplify, or PENDING if strict
         )
-        return True, f"Lista compartida con @{target_user.username or target_user.first_name}."
+        return (
+            True,
+            f"Lista compartida con @{target_user.username or target_user.first_name}.",
+        )
 
     @staticmethod
     def get_list_members(list_id: int) -> List[User]:
@@ -381,7 +405,10 @@ class TaskManager:
         # e.g. List="Shopping List", name="Shopping"
         owned = (
             TaskList.select()
-            .where((TaskList.owner == user_id) & (fn.Lower(TaskList.title).contains(name.lower())))
+            .where(
+                (TaskList.owner == user_id)
+                & (fn.Lower(TaskList.title).contains(name.lower()))
+            )
             .first()
         )
         if owned:
@@ -404,9 +431,21 @@ class TaskManager:
         # 3. Reverse search: check if any list title is contained in the search term
         all_lists = TaskManager.get_lists(user_id)
         name_norm = name.lower()
+
         # Helper to clean up query
         def clean(s):
-            stopwords = ["lista", "list", "de", "la", "el", "the", "una", "un", "los", "las"]
+            stopwords = [
+                "lista",
+                "list",
+                "de",
+                "la",
+                "el",
+                "the",
+                "una",
+                "un",
+                "los",
+                "las",
+            ]
             s = s.lower()
             for w in stopwords:
                 s = s.replace(w, "")
@@ -452,4 +491,8 @@ class TaskManager:
 
     @staticmethod
     def get_tasks_in_list(list_id: int) -> List[Task]:
-        return list(Task.select().where(Task.task_list == list_id).order_by(Task.status, Task.created_at))
+        return list(
+            Task.select()
+            .where(Task.task_list == list_id)
+            .order_by(Task.status, Task.created_at)
+        )

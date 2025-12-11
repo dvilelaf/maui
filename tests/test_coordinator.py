@@ -388,7 +388,7 @@ def test_get_lists_summary(coordinator, mocker):
 
     resp = coordinator.get_lists_summary(123)
     assert "L1" in resp
-    assert "5 tareas" in resp
+    assert "5 elementos" in resp
     assert "Propietario" in resp
 
 @pytest.mark.asyncio

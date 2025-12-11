@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
+
 from src.services.gemini import GeminiService
 from src.database.access import TaskManager, UserManager
 from src.utils.config import Config
 import logging
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from src.utils.schema import TaskExtractionResponse
 
 
 class Coordinator:
@@ -26,7 +31,12 @@ class Coordinator:
         """
         Main entry point for processing user messages.
         """
-        from src.utils.schema import UserIntent, TimeFilter, TaskStatus, TARGET_ALL, TaskExtractionResponse
+        from src.utils.schema import (
+            UserIntent,
+            TimeFilter,
+            TaskStatus,
+            TARGET_ALL,
+        )
 
         # Ensure user exists
         user = self.user_manager.get_or_create_user(
@@ -164,9 +174,24 @@ class Coordinator:
                 else:
                     return f"No tienes tareas {filter_text} para eliminar."
 
+            # Determine search scope: General or Specific List
+            scope_list_id = None
+            if extraction.formatted_task and extraction.formatted_task.list_name:
+                found_list = self.task_manager.find_list_by_name(
+                    user_id, extraction.formatted_task.list_name
+                )
+                if found_list:
+                    scope_list_id = found_list.id
+                else:
+                    # If user specified a list but we didn't find it, should we fail or search generally?
+                    # "Delete bread from shopping" -> "list 'shopping' not found". Safer to warn.
+                    return f"❌ No encontré ninguna lista llamada '{extraction.formatted_task.list_name}'."
+
             # Find the task
             candidates = self.task_manager.find_tasks_by_keyword(
-                user_id, extraction.target_search_term
+                user_id,
+                extraction.target_search_term,
+                list_id=scope_list_id,  # Pass this new arg
             )
 
             if not candidates:
@@ -288,7 +313,7 @@ class Coordinator:
             return "No tienes listas creadas ni compartidas."
 
         summary = "*Tus Listas:*\n\n"
-        for i, task_list in enumerate(lists, 1):
+        for task_list in lists:
             # Owner check
             is_owner = task_list.owner.telegram_id == user_id
             role = "👑 Propietario" if is_owner else "👥 Compartida"
@@ -296,8 +321,23 @@ class Coordinator:
             # Item count
             count = task_list.tasks.count()
 
-            summary += f"{i}. *{task_list.title}* ({count} tareas) | {role}\n"
-            # Show members? Maybe too verbose.
+            summary += f"• *{task_list.title}* ({count} elementos) | {role}\n"
 
-        summary += "\nUsa `/tasks <nombre lista>` (próximamente) o menciona la lista para añadir tareas."
+            # Show top 5 tasks or all? User asked for "perfectly all".
+            tasks = task_list.tasks
+            if tasks.exists():
+                for t in tasks:
+                    status_icon = "✅" if t.status == "COMPLETED" else "⬜"
+                    summary += f"   {status_icon} {t.title}\n"
+            else:
+                summary += "   _(Vacía)_\n"
+
+            summary += "\n"  # Spacing between lists
+
+        if not lists:
+            summary += "\nUse `/create_list <nombre>` para empezar."
+        else:
+            summary += (
+                "Usa `/tasks <nombre lista>` o menciona la lista para añadir tareas."
+            )
         return summary
