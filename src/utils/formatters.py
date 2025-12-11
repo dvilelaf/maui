@@ -2,10 +2,10 @@ from datetime import datetime, timedelta
 import pytz
 
 PRIORITY_MAP = {
-    "LOW": "Baja",
-    "MEDIUM": "Media",
-    "HIGH": "Alta",
-    "URGENT": "Urgente"
+    "LOW": "🟢",
+    "MEDIUM": "🟡",
+    "HIGH": "🟠",
+    "URGENT": "🔴"
 }
 
 DAYS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -45,8 +45,6 @@ def format_task_es(task) -> str:
     Returns a formatted string for a task.
     """
     date_str = format_datetime_es(task.deadline)
-    priority_str = PRIORITY_MAP.get(task.priority, task.priority)
+    priority_str = PRIORITY_MAP.get(task.priority, "⚪")
 
-    # But user asked for human readable.
-
-    return f"• *{task.title}* \n  ⏳ {date_str}  |  🚨 {priority_str}\n"
+    return f"• *{task.title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"

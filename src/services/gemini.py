@@ -33,8 +33,8 @@ class GeminiService:
         - 'is_relevant': True for all except UNKNOWN.
         - 'target_search_term': For CANCEL/COMPLETE/EDIT, providing the KEYWORDS to find the task (e.g., "milk", "calling mom", "meeting").
         - 'formatted_task':
-          - For ADD_TASK: Full details.
-          - For EDIT_TASK: Only the changed fields (e.g., new deadline).
+          - For ADD_TASK: A JSON OBJECT containing full details (e.g., {{"title": "Buy milk", "deadline": null}}). NEVER a string.
+          - For EDIT_TASK: A JSON OBJECT containing only the changed fields (e.g., {{"deadline": "2025-12-12"}}). NEVER a string.
 
         If UNKNOWN, provide reasoning in Spanish.
 
@@ -46,38 +46,51 @@ class GeminiService:
         Process text or audio input to extract task details.
         """
         from datetime import datetime
-        current_time = datetime.now().isoformat()
+        import time
+        from google.api_core.exceptions import InternalServerError, ServiceUnavailable
 
+        current_time = datetime.now().isoformat()
         system_instruction = self._get_system_prompt().format(current_time=current_time)
 
-        try:
-            prompt_parts = [system_instruction]
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                prompt_parts = [system_instruction]
 
-            if mime_type.startswith("audio/"):
-                # For audio, we might need to upload or pass bytes directly depending on SDK version.
-                # Simplest for now with 1.5 flash is passing the data part if supported,
-                # or treating it as a file upload if large.
-                # Assuming small voice notes, we can try passing blob if supported,
-                # typically genai.types.Blob requires data and mime_type.
-                prompt_parts.append({
-                    "mime_type": mime_type,
-                    "data": user_input
-                })
-                prompt_parts.append("Please transcribe this audio and extract the task details.")
-            else:
-                prompt_parts.append(user_input)
+                if mime_type.startswith("audio/"):
+                    prompt_parts.append({
+                        "mime_type": mime_type,
+                        "data": user_input
+                    })
+                    prompt_parts.append("Please transcribe this audio and extract the task details.")
+                else:
+                    prompt_parts.append(user_input)
 
-            response = self.model.generate_content(prompt_parts)
+                response = self.model.generate_content(prompt_parts)
+                self.logger.info(f"Gemini Raw Response: {response.text}")
 
-            self.logger.info(f"Gemini Raw Response: {response.text}")
+                return TaskExtractionResponse.model_validate_json(response.text)
 
-            # Pydantic validation
-            return TaskExtractionResponse.model_validate_json(response.text)
+            except (InternalServerError, ServiceUnavailable) as e:
+                self.logger.warning(f"Gemini API error (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                     from src.utils.schema import UserIntent
+                     return TaskExtractionResponse(
+                        is_relevant=False,
+                        intent=UserIntent.UNKNOWN,
+                        reasoning="El servicio de IA no está disponible en este momento. Inténtalo más tarde."
+                    )
+                time.sleep(1 * (attempt+1)) # Exponential-ish backoff
 
-        except Exception as e:
-            self.logger.error(f"Error processing input with Gemini: {e}")
-            # Return a safe fallback
-            return TaskExtractionResponse(
-                is_relevant=False,
-                reasoning="Failed to process input due to technical error."
-            )
+            except Exception as e:
+                self.logger.error(f"Error processing input with Gemini: {e}")
+                from src.utils.schema import UserIntent
+                return TaskExtractionResponse(
+                    is_relevant=False,
+                    intent=UserIntent.UNKNOWN,
+                    reasoning="Hubo un error técnico al procesar tu solicitud."
+                )
+
+        # Should not reach here normally
+        from src.utils.schema import UserIntent
+        return TaskExtractionResponse(is_relevant=False, intent=UserIntent.UNKNOWN, reasoning="Error desconocido.")

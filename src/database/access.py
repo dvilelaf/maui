@@ -53,11 +53,13 @@ class TaskManager:
         return query.execute() > 0
 
     @staticmethod
-    def edit_task(task_id: int, title: str = None, description: str = None, deadline: datetime = None) -> bool:
-        updates = {}
-        if title: updates['title'] = title
-        if description: updates['description'] = description
-        if deadline: updates['deadline'] = deadline
+    def edit_task(task_id: int, **kwargs) -> bool:
+        if not kwargs:
+            return False
+
+        # Filter kwargs to only allow valid fields
+        allowed_fields = {'title', 'description', 'deadline', 'priority', 'status'}
+        updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
 
         if not updates:
             return False

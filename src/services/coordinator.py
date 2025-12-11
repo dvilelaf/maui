@@ -10,6 +10,7 @@ class Coordinator:
         self.gemini = GeminiService(api_key=Config.GEMINI_API_KEY)
         self.task_manager = TaskManager()
         self.user_manager = UserManager()
+        self.logger = logger
 
     def handle_message(self, user_id: int, username: str, content: str | bytes, is_voice: bool = False) -> str:
         """
@@ -81,12 +82,14 @@ class Coordinator:
                 # I defined `title: Optional[str]` in the previous tool call for Schema update!
                 # So `exclude_unset=True` should work if I didn't set defaults in Schema.
 
-                self.task_manager.edit_task(
-                    target_task.id,
-                    title=updates.get('title'),
-                    description=updates.get('description'),
-                    deadline=updates.get('deadline')
-                )
+                # Code-side, we can check basic fields.
+                # Actually, in Schema, title and priority have defaults/required.
+                # I defined `title: Optional[str]` in the previous tool call for Schema update!
+                # So `exclude_unset=True` should work if I didn't set defaults in Schema.
+
+                self.logger.info(f"Updating task {target_task.id} with: {updates}")
+
+                self.task_manager.edit_task(target_task.id, **updates)
                 return f"✏️ Tarea actualizada: *{target_task.title}*"
 
         return "He entendido el mensaje pero no estoy seguro de qué hacer."
