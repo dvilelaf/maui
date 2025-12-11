@@ -305,15 +305,44 @@ class TaskManager:
         return TaskList.create(title=title, owner=user_id)
 
     @staticmethod
-    def share_list(list_id: int, target_username: str) -> tuple[bool, str]:
+    def share_list(list_id: int, target_query: str) -> tuple[bool, str]:
         """
+        Share a list with a user found by username or name.
         Returns (Success, Message)
         """
-        target_username = target_username.replace("@", "")
-        try:
-            target_user = User.get(User.username == target_username)
-        except User.DoesNotExist:
-            return False, f"Usuario @{target_username} no encontrado."
+        query_str = target_query.strip().replace("@", "")
+
+        # 1. Try Exact Username
+        target_user = User.get_or_none(User.username == query_str)
+
+        # 2. If not found, Fuzzy Search
+        if not target_user:
+            candidates = list(User.select().where(
+                (fn.Lower(User.first_name).contains(query_str.lower())) |
+                (fn.Lower(User.last_name).contains(query_str.lower())) |
+                (fn.Lower(User.username).contains(query_str.lower()))
+            ))
+
+            if len(candidates) == 0:
+                return False, f"Usuario '{target_query}' no encontrado."
+
+            if len(candidates) > 1:
+                # Try to refine: check exact First Name match
+                exact_name = [u for u in candidates if u.first_name and u.first_name.lower() == query_str.lower()]
+                if len(exact_name) == 1:
+                    target_user = exact_name[0]
+                else:
+                    names = [f"{u.first_name} {u.last_name or ''} (@{u.username or '-'})" for u in candidates[:3]]
+                    msg = ", ".join(names)
+                    if len(candidates) > 3:
+                        msg += "..."
+                    return False, f"Encontré varios usuarios: {msg}. Sé más específico."
+
+            if not target_user and len(candidates) == 1:
+                target_user = candidates[0]
+
+        if not target_user:
+             return False, f"Usuario '{target_query}' no encontrado."
 
         # Check if already shared
         exists = (
@@ -324,14 +353,14 @@ class TaskManager:
             .exists()
         )
         if exists:
-            return False, f"La lista ya está compartida con @{target_username}."
+            return False, f"La lista ya está compartida con @{target_user.username or target_user.first_name}."
 
         SharedAccess.create(
             user=target_user,
             task_list=list_id,
             status="ACCEPTED",  # Auto-accept for now to simplify, or PENDING if strict
         )
-        return True, f"Lista compartida con @{target_username}."
+        return True, f"Lista compartida con @{target_user.username or target_user.first_name}."
 
     @staticmethod
     def get_list_members(list_id: int) -> List[User]:
