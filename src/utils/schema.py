@@ -11,6 +11,8 @@ class UserIntent(str, Enum):
     CANCEL_TASK = "CANCEL_TASK"
     COMPLETE_TASK = "COMPLETE_TASK"
     EDIT_TASK = "EDIT_TASK"
+    CREATE_LIST = "CREATE_LIST"
+    SHARE_LIST = "SHARE_LIST"
     UNKNOWN = "UNKNOWN"
 
 
@@ -55,6 +57,12 @@ class TaskSchema(BaseModel):
     deadline: Optional[datetime] = Field(
         None,
         description="The deadline for the task, if explicitly mentioned or inferred.",
+    )
+    list_name: Optional[str] = Field(
+        None, description="Name of the list to add this task to, if specified."
+    )
+    shared_with: Optional[list[str]] = Field(
+        None, description="List of usernames (@user) to share with."
     )
 
     @field_validator("priority")

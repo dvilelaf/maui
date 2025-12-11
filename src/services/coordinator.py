@@ -54,6 +54,38 @@ class Coordinator:
             return extraction.reasoning or "No he entendido eso. ¿Podrías repetirlo?"
 
         # Handle Intents
+        if extraction.intent == UserIntent.CREATE_LIST:
+            list_name = (
+                extraction.formatted_task.title
+                if extraction.formatted_task
+                else "Nueva Lista"
+            )
+            new_list = self.task_manager.create_list(user_id, list_name)
+            return f"📋 Lista creada: *{new_list.title}*"
+
+        if extraction.intent == UserIntent.SHARE_LIST:
+            # Requires target_search_term (list name) and shared_with (usernames)
+            if (
+                not extraction.target_search_term
+                or not extraction.formatted_task
+                or not extraction.formatted_task.shared_with
+            ):
+                return "⚠️ Para compartir necesito el nombre de la lista y el usuario (ej: 'Compartir lista Compra con @ana')."
+
+            target_list = self.task_manager.find_list_by_name(
+                user_id, extraction.target_search_term
+            )
+            if not target_list:
+                return f"❌ No encontré ninguna lista llamada '{extraction.target_search_term}'."
+
+            results = []
+            for username in extraction.formatted_task.shared_with:
+                success, msg = self.task_manager.share_list(target_list.id, username)
+                emoji = "✅" if success else "⚠️"
+                results.append(f"{emoji} {msg}")
+
+            return "\n".join(results)
+
         if extraction.intent == UserIntent.QUERY_TASKS:
             time_filter = extraction.time_filter or TimeFilter.ALL
             return self.get_task_summary(

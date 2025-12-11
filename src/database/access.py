@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from src.database.models import User, Task
+from src.database.models import User, Task, TaskList, SharedAccess
 from src.utils.schema import TaskSchema, TimeFilter, TaskStatus
 
 import logging
@@ -59,6 +59,19 @@ class TaskManager:
         # For simplicity and robustness with SQLite/Peewee:
         from peewee import fn
 
+        # Resolve List if specified
+        target_list_id = None
+        if task_data.list_name:
+            # We need to use 'self' but this is static.
+            # We can just call TaskManager.find_list_by_name or use class method.
+            # Changing to class method might be better, but simpler:
+            found_list = TaskManager.find_list_by_name(user_id, task_data.list_name)
+            if found_list:
+                target_list_id = found_list.id
+            else:
+                # Optional: warn user? For now silently ignore or default to None
+                pass
+
         existing = (
             Task.select()
             .where(
@@ -80,6 +93,7 @@ class TaskManager:
             deadline=task_data.deadline,
             status=TaskStatus.PENDING,
             created_at=datetime.now(),
+            task_list=target_list_id,
         )
         logger.info(
             f"Task CREATED: ID={new_task.id} User={user_id} Title='{new_task.title}'"
@@ -208,3 +222,73 @@ class TaskManager:
                 )
             )
         )
+
+    @staticmethod
+    def create_list(user_id: int, title: str) -> TaskList:
+        return TaskList.create(title=title, owner=user_id)
+
+    @staticmethod
+    def share_list(list_id: int, target_username: str) -> tuple[bool, str]:
+        """
+        Returns (Success, Message)
+        """
+        target_username = target_username.replace("@", "")
+        try:
+            target_user = User.get(User.username == target_username)
+        except User.DoesNotExist:
+            return False, f"Usuario @{target_username} no encontrado."
+
+        # Check if already shared
+        exists = (
+            SharedAccess.select()
+            .where(
+                (SharedAccess.task_list == list_id) & (SharedAccess.user == target_user)
+            )
+            .exists()
+        )
+        if exists:
+            return False, f"La lista ya está compartida con @{target_username}."
+
+        SharedAccess.create(
+            user=target_user,
+            task_list=list_id,
+            status="ACCEPTED",  # Auto-accept for now to simplify, or PENDING if strict
+        )
+        return True, f"Lista compartida con @{target_username}."
+
+    @staticmethod
+    def get_list_members(list_id: int) -> List[User]:
+        owner = TaskList.get(TaskList.id == list_id).owner
+        shared = (
+            User.select()
+            .join(SharedAccess)
+            .where(
+                (SharedAccess.task_list == list_id)
+                & (SharedAccess.status == "ACCEPTED")
+            )
+        )
+        return [owner] + list(shared)
+
+    @staticmethod
+    def find_list_by_name(user_id: int, name: str) -> Optional[TaskList]:
+        # Search owned lists
+        owned = (
+            TaskList.select()
+            .where((TaskList.owner == user_id) & (TaskList.title.contains(name)))
+            .first()
+        )
+        if owned:
+            return owned
+
+        # Search shared lists
+        shared = (
+            TaskList.select()
+            .join(SharedAccess)
+            .where(
+                (SharedAccess.user == user_id)
+                & (SharedAccess.status == "ACCEPTED")
+                & (TaskList.title.contains(name))
+            )
+            .first()
+        )
+        return shared

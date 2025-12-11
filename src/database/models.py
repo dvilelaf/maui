@@ -27,6 +27,19 @@ class User(BaseModel):
     status = CharField(default=UserStatus.PENDING)
 
 
+class TaskList(BaseModel):
+    title = CharField()
+    owner = ForeignKeyField(User, backref="owned_lists")
+    created_at = DateTimeField(default=datetime.now)
+
+
+class SharedAccess(BaseModel):
+    user = ForeignKeyField(User, backref="shared_lists")
+    task_list = ForeignKeyField(TaskList, backref="members")
+    status = CharField(default="PENDING")  # PENDING, ACCEPTED
+    joined_at = DateTimeField(default=datetime.now)
+
+
 class Task(BaseModel):
     id = IntegerField(
         primary_key=True
@@ -43,9 +56,11 @@ class Task(BaseModel):
     created_at = DateTimeField(default=datetime.now)
     deadline = DateTimeField(null=True)
     status = CharField(default=TaskStatus.PENDING)  # PENDING, COMPLETED, CANCELLED
+    status = CharField(default=TaskStatus.PENDING)  # PENDING, COMPLETED, CANCELLED
     reminder_sent = BooleanField(default=False)
+    task_list = ForeignKeyField(TaskList, backref="tasks", null=True)
 
 
 def create_tables():
     with db:
-        db.create_tables([User, Task])
+        db.create_tables([User, Task, TaskList, SharedAccess])

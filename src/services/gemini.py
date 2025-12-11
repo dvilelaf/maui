@@ -82,7 +82,10 @@ class GeminiService:
         - QUERY_TASKS: List existing tasks. Can be filtered by time (e.g., "tasks for today", "what do I have this week").
         - CANCEL_TASK: Remove/cancel a specific task (e.g., "cancel the milk task").
         - COMPLETE_TASK: Mark a task as done (e.g., "I finished calling mom").
+
         - EDIT_TASK: Change details of a task (e.g., "postpone the meeting to Friday").
+        - CREATE_LIST: Create a new list (e.g., "Create a shopping list", "New list called Project X").
+        - SHARE_LIST: Share a list with someone (e.g., "Share shopping list with @juan").
         - UNKNOWN: Irrelevant input.
 
         Output matching the JSON schema:
@@ -96,7 +99,11 @@ class GeminiService:
             - If "cancel everything", set to "ALL".
         - 'formatted_task':
           - For ADD_TASK: Full details. "title": The content of the task. "deadline": if date w/o time, set to 23:59:59.
+            "list_name": If user specifies a list (e.g. "add to Shopping List").
           - For EDIT_TASK: Changed fields only.
+          - For CREATE_LIST: "title" is the name of the new list.
+          - For SHARE_LIST: "shared_with" is a list of usernames mentioned (e.g. ["juan"]). "target_search_term" is the name of the list.
+
 
         If UNKNOWN, provide reasoning in Spanish.
 
