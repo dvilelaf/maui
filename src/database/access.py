@@ -50,8 +50,24 @@ class UserManager:
 
 class TaskManager:
     @staticmethod
-    def add_task(user_id: int, task_data: TaskSchema) -> Task:
+    def add_task(user_id: int, task_data: TaskSchema) -> Optional[Task]:
         # task_data is now a validated Pydantic model
+
+        # Check for duplicates (case-insensitive title match for pending tasks)
+        # We need to use fn.Lower or similar if we want DB-side case insensitivity,
+        # or just fetch all pending and check in python if list is small.
+        # For simplicity and robustness with SQLite/Peewee:
+        from peewee import fn
+
+        existing = Task.select().where(
+            (Task.user == user_id)
+            & (Task.status == TaskStatus.PENDING)
+            & (fn.Lower(Task.title) == task_data.title.lower())
+        ).first()
+
+        if existing:
+            return None
+
         new_task = Task.create(
             user=user_id,
             title=task_data.title,

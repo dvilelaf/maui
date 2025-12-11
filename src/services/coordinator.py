@@ -63,9 +63,11 @@ class Coordinator:
         if extraction.intent == UserIntent.ADD_TASK and extraction.formatted_task:
             from src.utils.formatters import format_datetime_es
 
-            # Pass the Pydantic model directly
             # extraction.formatted_task is already a TaskSchema
             new_task = self.task_manager.add_task(user_id, extraction.formatted_task)
+
+            if not new_task:
+                 return f"⚠️ Ya tienes una tarea pendiente con ese nombre: *{extraction.formatted_task.title}*."
 
             deadline_str = (
                 f" para {format_datetime_es(new_task.deadline)}"
