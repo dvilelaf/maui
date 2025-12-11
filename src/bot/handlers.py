@@ -12,9 +12,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a welcome message when the command /start is issued."""
     user = update.effective_user
     await update.message.reply_html(
-        f"Hi {user.mention_html()}! I am Maui, your intelligent task assistant. 🌴\n"
-        f"Just send me a message (text or voice) describing what you need to do, "
-        f"and I'll organize it for you."
+        f"¡Hola {user.mention_html()}! Soy Maui, tu asistente de tareas inteligente. 🌴\n"
+        f"Simplemente envíame un mensaje (texto o voz) describiendo lo que necesitas hacer, "
+        f"y yo lo organizaré por ti."
     )
     # Ensure user is in DB
     coordinator.user_manager.get_or_create_user(user.id, user.username)
@@ -22,15 +22,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a help message when the command /help is issued."""
     await update.message.reply_text(
-        "I can help you manage your tasks!\n\n"
-        "Simply send me a message like:\n"
-        "- 'Buy milk tomorrow at 5pm'\n"
-        "- 'Call mom on Sunday'\n\n"
-        "Commands:\n"
-        "/tasks - Show pending tasks\n"
-        "/done <id> - Mark a task as completed\n"
-        "/cancel <id> - Cancel a task\n"
-        "/help - Show this message"
+        "¡Puedo ayudarte a gestionar tus tareas!\n\n"
+        "Envía un mensaje como:\n"
+        "- 'Comprar leche mañana a las 5pm'\n"
+        "- 'Llamar a mamá el domingo'\n\n"
+        "Comandos:\n"
+        "/tasks - Ver tareas pendientes\n"
+        "/done <id> - Marcar tarea como completada\n"
+        "/cancel <id> - Cancelar una tarea\n"
+        "/help - Mostrar este mensaje"
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,18 +84,18 @@ async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         task_id = int(context.args[0])
         if coordinator.task_manager.update_task_status(task_id, "COMPLETED"):
-            await update.message.reply_text(f"✅ Task {task_id} marked as completed!")
+            await update.message.reply_text(f"✅ ¡Tarea {task_id} marcada como completada!")
         else:
-            await update.message.reply_text(f"❌ Product not found or could not be updated.")
+            await update.message.reply_text(f"❌ Tarea no encontrada o no se pudo actualizar.")
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /done <task_id>")
+        await update.message.reply_text("Uso: /done <id_tarea>")
 
 async def cancel_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
         if coordinator.task_manager.update_task_status(task_id, "CANCELLED"):
-            await update.message.reply_text(f"🗑️ Task {task_id} cancelled.")
+            await update.message.reply_text(f"🗑️ Tarea {task_id} cancelada.")
         else:
-            await update.message.reply_text(f"❌ Task not found.")
+            await update.message.reply_text(f"❌ Tarea no encontrada.")
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /cancel <task_id>")
+        await update.message.reply_text("Uso: /cancel <id_tarea>")

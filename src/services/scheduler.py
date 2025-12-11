@@ -16,9 +16,9 @@ async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
     for user in users:
         tasks = task_manager.get_pending_tasks(user.telegram_id)
         if tasks:
-            summary = "📅 *Weekly Task Summary*:\n\n"
+            summary = "📅 *Resumen Semanal de Tareas*:\n\n"
             for task in tasks:
-                 deadline = task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else "No deadline"
+                 deadline = task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else "Sin fecha límite"
                  summary += f"• *{task.title}* (ID: {task.id})\n  _{deadline}_ - {task.priority}\n"
 
             try:
@@ -46,7 +46,7 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=task.user.telegram_id,
-                text=f"⏰ *Reminder*: Task *{task.title}* is due soon!\nDeadline: {task.deadline}",
+                text=f"⏰ *Recordatorio*: ¡La tarea *{task.title}* vence pronto!\nFecha límite: {task.deadline}",
                 parse_mode="Markdown"
             )
             # Mark as sent
