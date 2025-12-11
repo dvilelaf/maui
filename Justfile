@@ -47,3 +47,7 @@ whitelist target:
 # Blacklist a user (ID, @username, or 'all')
 blacklist target:
     uv run python src/tools/admin_tools.py blacklist {{target}}
+
+# Kick a user (ID or @username)
+kick target:
+    uv run python src/tools/admin_tools.py kick {{target}}

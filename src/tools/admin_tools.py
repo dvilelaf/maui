@@ -51,6 +51,23 @@ def update_status(user: User, status: UserStatus):
     except Exception as e:
         print(f"Error updating user status: {e}")
 
+def kick_user(user_id: int):
+    """Deletes a user and their tasks."""
+    try:
+        user = User.get_or_none(User.telegram_id == user_id)
+        if not user:
+            print(f"User {user_id} not found.")
+            return
+
+        # Delete tasks first (handled by cascade usually, but explicit is safe if no FK cascade)
+        # Assuming Task has ForeignKey to User.
+        from src.database.models import Task
+        count = Task.delete().where(Task.user == user.telegram_id).execute()
+        user.delete_instance()
+        print(f"User {user_id} ({user.username}) and {count} tasks deleted.")
+    except Exception as e:
+        print(f"Error kicking user {user_id}: {e}")
+
 def update_all_pending(status: UserStatus):
     """Updates all PENDING users to the new status."""
     try:
@@ -68,25 +85,33 @@ if __name__ == "__main__":
     init_db()
     if len(sys.argv) < 3:
         print("Usage: python admin_tools.py <whitelist|blacklist> <user_id|@username|all>")
+        print("Usage: python admin_tools.py <whitelist|blacklist|kick> <user_id|@username|all>")
         sys.exit(1)
 
     action = sys.argv[1].lower()
     target_input = sys.argv[2] # Keep as string
 
-    status = None
+    new_status = None
     if action == "whitelist":
-        status = UserStatus.WHITELISTED
+        new_status = UserStatus.WHITELISTED
     elif action == "blacklist":
-        status = UserStatus.BLACKLISTED
+        new_status = UserStatus.BLACKLISTED
+    elif action == "kick":
+        if target_input.lower() == "all":
+             print("Cannot kick ALL users via this command for safety.")
+             sys.exit(1)
+        user = resolve_user(target_input)
+        if user:
+            kick_user(user.telegram_id)
+        else:
+             print(f"User '{target_input}' not found.")
+        sys.exit(0)
     else:
-        print("Unknown action. Use 'whitelist' or 'blacklist'.")
+        print("Invalid command. Use 'whitelist', 'blacklist' or 'kick'")
         sys.exit(1)
 
     if target_input.lower() == "all":
         print(f"Running {action} for ALL pending users...")
-        update_all_pending(status)
-    else:
-        user = resolve_user(target_input)
         if user:
             update_status(user, status)
         else:

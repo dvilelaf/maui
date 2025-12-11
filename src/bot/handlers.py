@@ -13,7 +13,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a welcome message when the command /start is issued."""
     user = update.effective_user
     # Ensure user is in DB
-    user_db = coordinator.user_manager.get_or_create_user(user.id, user.username)
+    user_db = coordinator.user_manager.get_or_create_user(user.id, user.username, user.first_name, user.last_name)
 
     from src.utils.schema import UserStatus
     if user_db.status == UserStatus.PENDING:
@@ -56,11 +56,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_chat_action(action="typing")
 
-    response = coordinator.handle_message(
+    response = await coordinator.handle_message(
         user_id=user.id,
         username=user.username,
         content=text,
-        is_voice=False
+        is_voice=False,
+        first_name=user.first_name,
+        last_name=user.last_name
     )
 
     await update.message.reply_markdown(response)

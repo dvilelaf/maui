@@ -12,14 +12,14 @@ class Coordinator:
         self.user_manager = UserManager()
         self.logger = logger
 
-    def handle_message(self, user_id: int, username: str, content: str | bytes, is_voice: bool = False) -> str:
+    async def handle_message(self, user_id: int, username: str, content: str | bytes, is_voice: bool = False, first_name: str = None, last_name: str = None) -> str:
         """
         Main entry point for processing user messages.
         """
         from src.utils.schema import UserIntent, TimeFilter, TaskStatus, TARGET_ALL
 
         # Ensure user exists
-        user = self.user_manager.get_or_create_user(telegram_id=user_id, username=username)
+        user = self.user_manager.get_or_create_user(telegram_id=user_id, username=username, first_name=first_name, last_name=last_name)
 
         # Access Control
         from src.utils.schema import UserStatus

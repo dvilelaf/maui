@@ -10,6 +10,8 @@ class BaseModel(Model):
 class User(BaseModel):
     telegram_id = IntegerField(primary_key=True)
     username = CharField(null=True)
+    first_name = CharField(null=True)
+    last_name = CharField(null=True)
     notification_time = TimeField(default="09:00:00") # Default 9 AM
     reminder_lead_time_minutes = IntegerField(default=60) # Default 1 hour before
     status = CharField(default=UserStatus.PENDING)

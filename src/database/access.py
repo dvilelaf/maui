@@ -6,14 +6,31 @@ from src.utils.schema import TaskSchema, TimeFilter, TaskStatus
 
 class UserManager:
     @staticmethod
-    def get_or_create_user(telegram_id: int, username: str = None) -> User:
+    def get_or_create_user(telegram_id: int, username: str = None, first_name: str = None, last_name: str = None) -> User:
         user, created = User.get_or_create(
             telegram_id=telegram_id,
-            defaults={'username': username}
+            defaults={
+                'username': username,
+                'first_name': first_name,
+                'last_name': last_name
+            }
         )
-        if not created and username and user.username != username:
+
+        # Update info if changed
+        updates = []
+        if username and user.username != username:
             user.username = username
+            updates.append(True)
+        if first_name and user.first_name != first_name:
+            user.first_name = first_name
+            updates.append(True)
+        if last_name and user.last_name != last_name:
+            user.last_name = last_name
+            updates.append(True)
+
+        if updates:
             user.save()
+
         return user
 
 class TaskManager:
