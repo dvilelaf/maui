@@ -11,6 +11,8 @@ async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
     """
     Sends a weekly summary to all users.
     """
+    from src.utils.formatters import format_task_es
+
     logger.info("Running weekly summary job")
     users = User.select()
     for user in users:
@@ -18,8 +20,7 @@ async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
         if tasks:
             summary = "📅 *Resumen Semanal de Tareas*:\n\n"
             for task in tasks:
-                 deadline = task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else "Sin fecha límite"
-                 summary += f"• *{task.title}* (ID: {task.id})\n  _{deadline}_ - {task.priority}\n"
+                 summary += format_task_es(task)
 
             try:
                 await context.bot.send_message(chat_id=user.telegram_id, text=summary, parse_mode="Markdown")

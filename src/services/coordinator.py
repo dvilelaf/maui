@@ -31,10 +31,13 @@ class Coordinator:
             return self.get_weekly_summary(user_id)
 
         if extraction.intent == "ADD_TASK" and extraction.formatted_task:
+            from src.utils.formatters import format_datetime_es
+
             task_data = extraction.formatted_task.model_dump()
             new_task = self.task_manager.add_task(user_id, task_data)
-            deadline_str = f" para el {new_task.deadline}" if new_task.deadline else ""
-            return f"✅ Tarea guardada: *{new_task.title}* {deadline_str}\n(ID: {new_task.id})"
+
+            deadline_str = f" para {format_datetime_es(new_task.deadline)}" if new_task.deadline else ""
+            return f"✅ Tarea guardada: *{new_task.title}*{deadline_str}"
 
         # Handle Task Modification Intents
         if extraction.intent in ("CANCEL_TASK", "COMPLETE_TASK", "EDIT_TASK"):
@@ -89,13 +92,14 @@ class Coordinator:
         return "He entendido el mensaje pero no estoy seguro de qué hacer."
 
     def get_weekly_summary(self, user_id: int) -> str:
+        from src.utils.formatters import format_task_es
+
         tasks = self.task_manager.get_pending_tasks(user_id)
         if not tasks:
             return "¡No tienes tareas pendientes para esta semana! 🎉"
 
         summary = "📅 *Resumen Semanal de Tareas*:\n\n"
         for task in tasks:
-            deadline = task.deadline.strftime('%Y-%m-%d %H:%M') if task.deadline else "Sin fecha límite"
-            summary += f"• *{task.title}* (ID: {task.id})\n  _{deadline}_ - {task.priority}\n"
+            summary += format_task_es(task)
 
         return summary
