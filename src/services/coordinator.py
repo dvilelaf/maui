@@ -57,8 +57,8 @@ class Coordinator:
             target_task = candidates[0]
 
             if extraction.intent == "CANCEL_TASK":
-                self.task_manager.update_task_status(target_task.id, "CANCELLED")
-                return f"🗑️ Tarea cancelada: *{target_task.title}*"
+                self.task_manager.delete_task(target_task.id)
+                return f"🗑️ Tarea eliminada: *{target_task.title}*"
 
             if extraction.intent == "COMPLETE_TASK":
                 self.task_manager.update_task_status(target_task.id, "COMPLETED")
