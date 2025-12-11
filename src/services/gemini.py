@@ -1,9 +1,7 @@
 import google.generativeai as genai
-import os
-import json
 from src.utils.schema import TaskExtractionResponse
 from src.utils.config import Config
-from typing import Optional, Union
+from typing import Union
 import logging
 
 
@@ -201,7 +199,7 @@ class GeminiService:
                     # Try rotating keys first
                     # We try all keys for the CURRENT model before giving up on the model
                     keys_tried = 0
-                    success_with_other_key = False
+
 
                     while keys_tried < len(self.api_keys) - 1:  # Try other keys
                         self._rotate_key()

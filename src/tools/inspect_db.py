@@ -83,7 +83,7 @@ class EditUserModal(ModalScreen):
             self.dismiss()
 
         elif event.button.id == "whitelist":
-            from src.tools.admin_tools import update_status
+
 
             status = UserStatus.WHITELISTED
             user.status = status
@@ -92,7 +92,7 @@ class EditUserModal(ModalScreen):
             self.app.notify(f"User {self.user_id} Whitelisted")
             self.dismiss()
         elif event.button.id == "blacklist":
-            from src.tools.admin_tools import update_status
+
 
             status = UserStatus.BLACKLISTED
             user.status = status
@@ -275,7 +275,7 @@ class DatabaseMonitor(App):
             table = self.query_one(table_id, DataTable)
             table.focus()
             table.action_cursor_up()
-        except:
+        except Exception:
             pass
 
     def action_scroll_down(self):
@@ -285,7 +285,7 @@ class DatabaseMonitor(App):
             table = self.query_one(table_id, DataTable)
             table.focus()
             table.action_cursor_down()
-        except:
+        except Exception:
             pass
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -425,7 +425,7 @@ class DatabaseMonitor(App):
                     "Deadline": deadline,
                     "Status": t.status,
                 }
-        except Exception as e:
+        except Exception:
             # self.notify(str(e)) # Debug
             return
 

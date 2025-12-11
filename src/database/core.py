@@ -1,6 +1,4 @@
 from peewee import DatabaseProxy, SqliteDatabase
-import os
-from pathlib import Path
 
 # Use a proxy to initialize the database later
 db = DatabaseProxy()

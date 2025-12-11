@@ -35,7 +35,7 @@ async def send_pending_alert(context: ContextTypes.DEFAULT_TYPE):
     """
     Sends an alert on Fridays if there are pending tasks.
     """
-    from src.utils.formatters import format_task_es, format_datetime_es
+    from src.utils.formatters import format_datetime_es
 
     logger.info("Running pending alert job")
     users = User.select()
@@ -77,7 +77,7 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
             & (Task.deadline.is_null(False))
             & (Task.deadline > now)
             & (Task.deadline <= time_threshold)
-            & (Task.reminder_sent == False)
+            & (Task.reminder_sent == False)  # noqa: E712
         )
     )
 

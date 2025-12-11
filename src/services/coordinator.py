@@ -134,12 +134,46 @@ class Coordinator:
                     f"Updating task {target_task.id} with: {extraction.formatted_task}"
                 )
 
+                # Identify changes
+                updates = extraction.formatted_task.model_dump(exclude_unset=True)
+                changes = []
+
+                if "title" in updates and updates["title"] != target_task.title:
+                    changes.append(f"📝 Título: {target_task.title} -> {updates['title']}")
+
+                if "description" in updates and updates["description"] != target_task.description:
+                    changes.append("📄 Descripción actualizada")
+
+                if (
+                    "status" in updates
+                    and updates["status"] != target_task.status
+                ):
+                    changes.append(f"📊 Estado: {target_task.status} -> {updates['status']}")
+
+                if "priority" in updates and updates["priority"] != target_task.priority:
+                     changes.append(f"🚨 Prioridad: {target_task.priority} -> {updates['priority']}")
+
+                if "deadline" in updates:
+                    # Compare datetimes safely
+                    old_dead = target_task.deadline
+                    new_dead = updates["deadline"]
+
+                    # If both are None, no change. If one is None, change. If values differ, change.
+                    if old_dead != new_dead:
+                        from src.utils.formatters import format_datetime_es
+                        old_str = format_datetime_es(old_dead) if old_dead else "Sin fecha"
+                        new_str = format_datetime_es(new_dead) if new_dead else "Sin fecha"
+                        changes.append(f"📅 Fecha: {old_str} -> {new_str}")
+
                 success = self.task_manager.edit_task(
                     target_task.id, extraction.formatted_task
                 )
 
                 if success:
-                    return f"✏️ Tarea actualizada: *{target_task.title}*"
+                    msg = f"✏️ Tarea actualizada: *{target_task.title}*"
+                    if changes:
+                        msg += "\n" + "\n".join(changes)
+                    return msg
                 else:
                     return "❌ No se pudo actualizar la tarea (quizás no hubo cambios)."
 
@@ -148,7 +182,7 @@ class Coordinator:
     def get_task_summary(
         self, user_id: int, time_filter: str = "ALL", priority_filter: str = None
     ) -> str:
-        from src.utils.formatters import format_task_es, format_datetime_es
+        from src.utils.formatters import format_task_es
         from src.utils.schema import TimeFilter
 
         # Map filter to readable text

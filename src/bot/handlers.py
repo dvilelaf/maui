@@ -1,4 +1,3 @@
-```python
 from telegram import Update
 from telegram.ext import ContextTypes
 from src.services.coordinator import Coordinator
@@ -118,10 +117,11 @@ async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Uso: /done <id_tarea>")
 
 
+
 async def cancel_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
-        if coordinator.task_manager.update_task_status(task_id, "CANCELLED"):
+        success = coordinator.task_manager.update_task_status(task_id, "CANCELLED")
         if success:
             await update.message.reply_text(f"🗑️ Tarea {task_id} cancelada.")
         else:

@@ -60,7 +60,6 @@ def main():
             send_pending_alert,
         )
         from datetime import time
-        import pytz
 
         # Weekly summary every Monday at 8:00 AM
         job_queue.run_daily(

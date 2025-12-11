@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
 from src.database.models import User, Task
-from src.database.core import db
 from src.utils.schema import TaskSchema, TimeFilter, TaskStatus
 
 import logging
