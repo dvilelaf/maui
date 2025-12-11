@@ -96,7 +96,7 @@ def update_all_pending(status: UserStatus):
 
 
 if __name__ == "__main__":
-    init_db()
+    init_db(Config.DATABASE_URL)
     # Ensure tables exist (crucial for first run or separate script execution)
     from src.database.models import User, Task
     from src.database.core import db
