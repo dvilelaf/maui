@@ -27,6 +27,31 @@ async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Failed to send summary to {user.telegram_id}: {e}")
 
+async def send_pending_alert(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Sends an alert on Fridays if there are pending tasks.
+    """
+    from src.utils.formatters import format_task_es, format_datetime_es
+
+    logger.info("Running pending alert job")
+    users = User.select()
+    for user in users:
+        tasks = task_manager.get_pending_tasks(user.telegram_id)
+        if tasks:
+            summary = "⚠️ *Tienes tareas pendientes para cerrar la semana*:\n\n"
+            for task in tasks:
+                 deadline_str = f" (Vence: {format_datetime_es(task.deadline)})" if task.deadline else ""
+                 summary += f"• {task.title}{deadline_str}\n"
+
+            try:
+                await context.bot.send_message(
+                    chat_id=user.telegram_id,
+                    text=summary + "\n¡Ánimo! 💪",
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logger.error(f"Failed to send pending alert to {user.telegram_id}: {e}")
+
 async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Checks for upcoming deadlines and sends reminders.
