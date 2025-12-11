@@ -4,3 +4,5 @@
 maui.db
 
 __pycache__/
+
+.coverage

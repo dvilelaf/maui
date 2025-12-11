@@ -40,7 +40,7 @@ run:
 
 # Run the tests
 test:
-    uv run pytest
+    uv run pytest --cov=src --cov-report=term-missing
 
 # View Database contents
 db:

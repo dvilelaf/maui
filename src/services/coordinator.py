@@ -18,6 +18,7 @@ class Coordinator:
         user_id: int,
         username: str,
         content: str | bytes,
+        extraction: "TaskExtractionResponse | None" = None,
         is_voice: bool = False,
         first_name: str = None,
         last_name: str = None,
@@ -25,7 +26,7 @@ class Coordinator:
         """
         Main entry point for processing user messages.
         """
-        from src.utils.schema import UserIntent, TimeFilter, TaskStatus, TARGET_ALL
+        from src.utils.schema import UserIntent, TimeFilter, TaskStatus, TARGET_ALL, TaskExtractionResponse
 
         # Ensure user exists
         user = self.user_manager.get_or_create_user(
@@ -48,7 +49,8 @@ class Coordinator:
         mime_type = "audio/ogg" if is_voice else "text/plain"
 
         # 1. Extract intent/task via Gemini
-        extraction = self.gemini.process_input(content, mime_type=mime_type)
+        if not extraction:
+            extraction = self.gemini.process_input(content, mime_type=mime_type)
 
         if not extraction.is_relevant:
             return extraction.reasoning or "No he entendido eso. ¿Podrías repetirlo?"

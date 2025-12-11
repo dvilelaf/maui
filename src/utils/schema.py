@@ -64,6 +64,9 @@ class TaskSchema(BaseModel):
     shared_with: Optional[list[str]] = Field(
         None, description="List of usernames (@user) to share with."
     )
+    status: Optional[str] = Field(
+        None, description="Task status (PENDING, COMPLETED, CANCELLED)"
+    )
 
     @field_validator("priority")
     def validate_priority(cls, v):

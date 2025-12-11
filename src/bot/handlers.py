@@ -86,14 +86,18 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_file = await context.bot.get_file(voice.file_id)
     file_bytes = await new_file.download_as_bytearray()
 
-    response = await coordinator.handle_message(
-        user_id=user.id,
-        username=user.username,
-        content=bytes(file_bytes),
-        is_voice=True,
-    )
+    try:
+        response = await coordinator.handle_message(
+            user_id=user.id,
+            username=user.username,
+            content=bytes(file_bytes),
+            is_voice=True,
+        )
 
-    await update.message.reply_markdown(response)
+        await update.message.reply_markdown(response)
+    except Exception as e:
+        logger.error(f"Error handling voice message: {e}")
+        await update.message.reply_text("Lo siento, hubo un error al procesar tu audio. Por favor intenta de nuevo.")
 
 
 async def get_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

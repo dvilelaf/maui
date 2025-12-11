@@ -347,7 +347,7 @@ class DatabaseMonitor(App):
         db_url = Config.DATABASE_URL.replace("sqlite:///", "").replace("sqlite:", "")
         db_path = os.path.abspath(db_url)
         init_db(db_path)
-        db.connect()
+        db.connect(reuse_if_open=True)
 
     def refresh_data(self):
         # Always update both to keep cache fresh and prevent "highlight all" on tab switch
@@ -358,32 +358,35 @@ class DatabaseMonitor(App):
 
     def update_users(self):
         table = self.query_one("#users_table", DataTable)
-        users_query = User.select().dicts()
+        try:
+            users_query = User.select().dicts()
 
-        current_data = {}
-        for user in users_query:
-            current_data[user["telegram_id"]] = {
-                "Telegram ID": str(user["telegram_id"]),
-                "Username": user["username"] or "-",
-                "First Name": user["first_name"] or "-",
-                "Last Name": user["last_name"] or "-",
-                "Status": user["status"],
-                "Notif. Time": str(user["notification_time"]),
-            }
+            current_data = {}
+            for user in users_query:
+                current_data[user["telegram_id"]] = {
+                    "Telegram ID": str(user["telegram_id"]),
+                    "Username": user["username"] or "-",
+                    "First Name": user["first_name"] or "-",
+                    "Last Name": user["last_name"] or "-",
+                    "Status": user["status"],
+                    "Notif. Time": str(user["notification_time"]),
+                }
 
-        self._update_table(
-            table,
-            "users",
-            current_data,
-            [
-                "Telegram ID",
-                "Username",
-                "First Name",
-                "Last Name",
-                "Status",
-                "Notif. Time",
-            ],
-        )
+            self._update_table(
+                table,
+                "users",
+                current_data,
+                [
+                    "Telegram ID",
+                    "Username",
+                    "First Name",
+                    "Last Name",
+                    "Status",
+                    "Notif. Time",
+                ],
+            )
+        except Exception:
+            return
 
     def update_tasks(self):
         table = self.query_one("#tasks_table", DataTable)
@@ -391,11 +394,11 @@ class DatabaseMonitor(App):
         # Joins to get username
         # Peewee select with join
         # Peewee select with join
-        query = Task.select(Task, User).join(User).where(Task.task_list.is_null())
 
         current_data = {}
 
         try:
+            query = Task.select(Task, User).join(User).where(Task.task_list.is_null())
             # Helper for priority
             priority_map = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🟠", "URGENT": "🔴"}
 
@@ -437,10 +440,10 @@ class DatabaseMonitor(App):
         table = self.query_one("#lists_table", DataTable)
 
         # Join Owner
-        query = TaskList.select(TaskList, User).join(User)
 
         current_data = {}
         try:
+            query = TaskList.select(TaskList, User).join(User)
             for task_list in query:
                 owner = task_list.owner.username or f"{task_list.owner.first_name}"
 
