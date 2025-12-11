@@ -3,7 +3,7 @@ import asyncio
 import logging
 from telegram import Bot
 from src.database.models import User
-from src.database.core import db, init_db
+from src.database.core import init_db
 from src.utils.schema import UserStatus
 from src.utils.config import Config
 
@@ -12,6 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
 
 async def notify_user(user_id: int, message: str):
     """Sends a notification to the user."""
@@ -22,16 +23,18 @@ async def notify_user(user_id: int, message: str):
     except Exception as e:
         logger.error(f"Failed to send notification to user {user_id}: {e}")
 
+
 def resolve_user(target: str):
     """Resolve a target string (ID or @username) to a User object."""
     if target.isdigit():
         return User.get_or_none(User.telegram_id == int(target))
     elif target.startswith("@"):
-        username = target[1:] # Remove @
+        username = target[1:]  # Remove @
         return User.get_or_none(User.username == username)
     else:
         # Try as username without @
         return User.get_or_none(User.username == target)
+
 
 def update_status(user: User, status: UserStatus):
     try:
@@ -53,6 +56,7 @@ def update_status(user: User, status: UserStatus):
     except Exception as e:
         print(f"Error updating user status: {e}")
 
+
 def kick_user(user_id: int):
     """Deletes a user and their tasks."""
     try:
@@ -64,13 +68,19 @@ def kick_user(user_id: int):
         # Delete tasks first (handled by cascade usually, but explicit is safe if no FK cascade)
         # Assuming Task has ForeignKey to User.
         from src.database.models import Task
+
         task_count = Task.delete().where(Task.user == user.telegram_id).execute()
         # Delete User
         user.delete_instance()
-        logger.warning(f"User KICKED (Deleted): {user.telegram_id} and {task_count} tasks.")
-        print(f"✅ User {user.telegram_id} (@{user.username}) and their {task_count} tasks have been deleted.")
+        logger.warning(
+            f"User KICKED (Deleted): {user.telegram_id} and {task_count} tasks."
+        )
+        print(
+            f"✅ User {user.telegram_id} (@{user.username}) and their {task_count} tasks have been deleted."
+        )
     except Exception as e:
         print(f"Error kicking user {user_id}: {e}")
+
 
 def update_all_pending(status: UserStatus):
     """Updates all PENDING users to the new status."""
@@ -88,27 +98,30 @@ def update_all_pending(status: UserStatus):
 if __name__ == "__main__":
     init_db()
     if len(sys.argv) < 3:
-        print("Usage: python admin_tools.py <whitelist|blacklist> <user_id|@username|all>")
-        print("Usage: python admin_tools.py <whitelist|blacklist|kick> <user_id|@username|all>")
+        print(
+            "Usage: python admin_tools.py <whitelist|blacklist> <user_id|@username|all>"
+        )
+        print(
+            "Usage: python admin_tools.py <whitelist|blacklist|kick> <user_id|@username|all>"
+        )
         sys.exit(1)
 
     action = sys.argv[1].lower()
-    target_input = sys.argv[2] # Keep as string
+    target_input = sys.argv[2]  # Keep as string
 
-    new_status = None
     if action == "whitelist":
         new_status = UserStatus.WHITELISTED
     elif action == "blacklist":
         new_status = UserStatus.BLACKLISTED
     elif action == "kick":
         if target_input.lower() == "all":
-             print("Cannot kick ALL users via this command for safety.")
-             sys.exit(1)
+            print("Cannot kick ALL users via this command for safety.")
+            sys.exit(1)
         user = resolve_user(target_input)
         if user:
             kick_user(user.telegram_id)
         else:
-             print(f"User '{target_input}' not found.")
+            print(f"User '{target_input}' not found.")
         sys.exit(0)
     else:
         print("Invalid command. Use 'whitelist', 'blacklist' or 'kick'")
@@ -116,7 +129,10 @@ if __name__ == "__main__":
 
     if target_input.lower() == "all":
         print(f"Running {action} for ALL pending users...")
+        update_all_pending(new_status)
+    else:
+        user = resolve_user(target_input)
         if user:
-            update_status(user, status)
+            update_status(user, new_status)
         else:
             print(f"User '{target_input}' not found.")

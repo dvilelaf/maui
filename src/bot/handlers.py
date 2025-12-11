@@ -1,7 +1,8 @@
+```python
 from telegram import Update
 from telegram.ext import ContextTypes
 from src.services.coordinator import Coordinator
-from src.utils.schema import TaskStatus
+from src.utils.schema import TaskStatus, UserStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,13 +10,15 @@ logger = logging.getLogger(__name__)
 # Initialize coordinator
 coordinator = Coordinator()
 
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a welcome message when the command /start is issued."""
     user = update.effective_user
     # Ensure user is in DB
-    user_db = coordinator.user_manager.get_or_create_user(user.id, user.username, user.first_name, user.last_name)
+    user_db = coordinator.user_manager.get_or_create_user(
+        user.id, user.username, user.first_name, user.last_name
+    )
 
-    from src.utils.schema import UserStatus
     if user_db.status == UserStatus.PENDING:
         await update.message.reply_text(
             f"¡Hola {user.first_name}! 👋\n\n"
@@ -24,13 +27,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     elif user_db.status == UserStatus.BLACKLISTED:
-        return # Ignore
+        return  # Ignore
 
     await update.message.reply_html(
         f"¡Hola {user.mention_html()}! Soy Maui, tu asistente de tareas inteligente. 🌴\n"
         f"Simplemente envíame un mensaje (texto o voz) describiendo lo que necesitas hacer, "
         f"y yo lo organizaré por ti."
     )
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a help message when the command /help is issued."""
@@ -45,6 +49,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/cancel <id> - Cancelar una tarea\n"
         "/help - Mostrar este mensaje"
     )
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming text messages."""
@@ -62,10 +67,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         content=text,
         is_voice=False,
         first_name=user.first_name,
-        last_name=user.last_name
+        last_name=user.last_name,
     )
 
     await update.message.reply_markdown(response)
+
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming voice messages."""
@@ -85,32 +91,40 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id=user.id,
         username=user.username,
         content=bytes(file_bytes),
-        is_voice=True
+        is_voice=True,
     )
 
     await update.message.reply_markdown(response)
+
 
 async def list_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     summary = coordinator.get_weekly_summary(user.id)
     await update.message.reply_markdown(summary)
 
+
 async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
         if coordinator.task_manager.update_task_status(task_id, TaskStatus.COMPLETED):
-            await update.message.reply_text(f"✅ ¡Tarea {task_id} marcada como completada!")
+            await update.message.reply_text(
+                f"✅ ¡Tarea {task_id} marcada como completada!"
+            )
         else:
-            await update.message.reply_text(f"❌ Tarea no encontrada o no se pudo actualizar.")
+            await update.message.reply_text(
+                f"❌ Tarea {task_id} no encontrada o no se pudo actualizar."
+            )
     except (IndexError, ValueError):
         await update.message.reply_text("Uso: /done <id_tarea>")
+
 
 async def cancel_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
         if coordinator.task_manager.update_task_status(task_id, "CANCELLED"):
+        if success:
             await update.message.reply_text(f"🗑️ Tarea {task_id} cancelada.")
         else:
-            await update.message.reply_text(f"❌ Tarea no encontrada.")
+            await update.message.reply_text("❌ Tarea no encontrada.")
     except (IndexError, ValueError):
         await update.message.reply_text("Uso: /cancel <id_tarea>")

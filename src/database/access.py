@@ -8,16 +8,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class UserManager:
     @staticmethod
-    def get_or_create_user(telegram_id: int, username: str = None, first_name: str = None, last_name: str = None) -> User:
+    def get_or_create_user(
+        telegram_id: int,
+        username: str = None,
+        first_name: str = None,
+        last_name: str = None,
+    ) -> User:
         user, created = User.get_or_create(
             telegram_id=telegram_id,
             defaults={
-                'username': username,
-                'first_name': first_name,
-                'last_name': last_name
-            }
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+            },
         )
 
         if created:
@@ -37,10 +43,11 @@ class UserManager:
 
         if updates:
             user.save()
-            if not created: # Only log update if it wasn't just created
+            if not created:  # Only log update if it wasn't just created
                 logger.info(f"User UPDATED: ID={telegram_id} (@{username})")
 
         return user
+
 
 class TaskManager:
     @staticmethod
@@ -53,13 +60,19 @@ class TaskManager:
             priority=task_data.priority,
             deadline=task_data.deadline,
             status=TaskStatus.PENDING,
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
-        logger.info(f"Task CREATED: ID={new_task.id} User={user_id} Title='{new_task.title}'")
+        logger.info(
+            f"Task CREATED: ID={new_task.id} User={user_id} Title='{new_task.title}'"
+        )
         return new_task
 
     @staticmethod
-    def get_pending_tasks(user_id: int, time_filter: TimeFilter = TimeFilter.ALL, priority_filter: str = None) -> List[Task]:
+    def get_pending_tasks(
+        user_id: int,
+        time_filter: TimeFilter = TimeFilter.ALL,
+        priority_filter: str = None,
+    ) -> List[Task]:
         from datetime import datetime, timedelta
 
         query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
@@ -69,23 +82,22 @@ class TaskManager:
         if time_filter == TimeFilter.TODAY:
             # Deadline <= Today 23:59:59 (and not none)
             end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-            query &= (Task.deadline <= end_of_day)
+            query &= Task.deadline <= end_of_day
 
         elif time_filter == TimeFilter.WEEK:
             # Deadline <= Now + 7 days
             end_of_week = now + timedelta(days=7)
-            query &= (Task.deadline <= end_of_week)
+            query &= Task.deadline <= end_of_week
 
         elif time_filter == TimeFilter.MONTH:
-             # Deadline <= Now + 30 days
+            # Deadline <= Now + 30 days
             end_of_month = now + timedelta(days=30)
-            query &= (Task.deadline <= end_of_month)
+            query &= Task.deadline <= end_of_month
 
         elif time_filter == TimeFilter.YEAR:
-             # Deadline <= Now + 365 days
+            # Deadline <= Now + 365 days
             end_of_year = now + timedelta(days=365)
-            end_of_year = now + timedelta(days=365)
-            query &= (Task.deadline <= end_of_year)
+            query &= Task.deadline <= end_of_year
 
         if priority_filter:
             query &= (Task.priority == priority_filter)
@@ -122,7 +134,9 @@ class TaskManager:
         return query.execute() > 0
 
     @staticmethod
-    def delete_all_pending_tasks(user_id: int, time_filter: TimeFilter = TimeFilter.ALL) -> int:
+    def delete_all_pending_tasks(
+        user_id: int, time_filter: TimeFilter = TimeFilter.ALL
+    ) -> int:
         from datetime import datetime, timedelta
 
         query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
@@ -131,19 +145,19 @@ class TaskManager:
 
         if time_filter == TimeFilter.TODAY:
             end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-            query &= (Task.deadline <= end_of_day)
+            query &= Task.deadline <= end_of_day
 
         elif time_filter == TimeFilter.WEEK:
             end_of_week = now + timedelta(days=7)
-            query &= (Task.deadline <= end_of_week)
+            query &= Task.deadline <= end_of_week
 
         elif time_filter == TimeFilter.MONTH:
             end_of_month = now + timedelta(days=30)
-            query &= (Task.deadline <= end_of_month)
+            query &= Task.deadline <= end_of_month
 
         elif time_filter == TimeFilter.YEAR:
             end_of_year = now + timedelta(days=365)
-            query &= (Task.deadline <= end_of_year)
+            query &= Task.deadline <= end_of_year
 
         return Task.delete().where(query).execute()
 
@@ -158,15 +172,20 @@ class TaskManager:
             return False
 
         # Filter to allowed fields (safety check, though Schema enforces structure)
-        allowed_fields = {'title', 'description', 'deadline', 'priority', 'status'}
+        allowed_fields = {"title", "description", "deadline", "priority", "status"}
         updates = {k: v for k, v in updates.items() if k in allowed_fields}
 
         return Task.update(**updates).where(Task.id == task_id).execute() > 0
 
     @staticmethod
     def find_tasks_by_keyword(user_id: int, keyword: str) -> List[Task]:
-        return list(Task.select().where(
-            (Task.user == user_id) &
-            (Task.status == TaskStatus.PENDING) &
-            ((Task.title.contains(keyword)) | (Task.description.contains(keyword)))
-        ))
+        return list(
+            Task.select().where(
+                (Task.user == user_id)
+                & (Task.status == TaskStatus.PENDING)
+                & (
+                    (Task.title.contains(keyword))
+                    | (Task.description.contains(keyword))
+                )
+            )
+        )

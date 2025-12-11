@@ -1,31 +1,29 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static, Label, Button, Input, TabbedContent, TabPane
-from textual.containers import Container, Horizontal, Vertical
-from textual.reactive import reactive
+from textual.widgets import Header, Footer, DataTable, Label, Button, Input, TabbedContent, TabPane
+from textual.containers import Container
 from textual.screen import ModalScreen
-from textual.binding import Binding
 from rich.text import Text
-import datetime
 import os
 import time
 import logging
-
-# Configure logger also here if run independently, though it inherits if imported (but this is main script often)
-logger = logging.getLogger("inspect_db")
 
 from src.database.core import db, init_db
 from src.database.models import User, Task
 from src.utils.config import Config
 from src.utils.schema import TaskStatus, UserStatus
 
+# Configure logger also here if run independently, though it inherits if imported (but this is main script often)
+logger = logging.getLogger("inspect_db")
+
 # Highlight duration in seconds
 HIGHLIGHT_DURATION = 5.0
+
 
 class EditUserModal(ModalScreen):
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("up", "manual_focus_previous", "Previous"),
-        ("down", "manual_focus_next", "Next")
+        ("down", "manual_focus_next", "Next"),
     ]
 
     def action_manual_focus_previous(self):
@@ -43,6 +41,7 @@ class EditUserModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         from src.database.models import User
+
         user = User.get_or_none(User.telegram_id == self.user_id)
 
         username = user.username if user and user.username else ""
@@ -66,6 +65,7 @@ class EditUserModal(ModalScreen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         from src.database.models import User
+
         user = User.get_or_none(User.telegram_id == self.user_id)
         if not user:
             self.dismiss()
@@ -76,12 +76,15 @@ class EditUserModal(ModalScreen):
             user.first_name = self.query_one("#first_name", Input).value
             user.last_name = self.query_one("#last_name", Input).value
             user.save()
-            logger.info(f"User {self.user_id} manual update: username={user.username}, name={user.first_name} {user.last_name}")
+            logger.info(
+                f"User {self.user_id} manual update: username={user.username}, name={user.first_name} {user.last_name}"
+            )
             self.app.notify(f"User {self.user_id} Updated")
             self.dismiss()
 
         elif event.button.id == "whitelist":
             from src.tools.admin_tools import update_status
+
             status = UserStatus.WHITELISTED
             user.status = status
             user.save()
@@ -90,6 +93,7 @@ class EditUserModal(ModalScreen):
             self.dismiss()
         elif event.button.id == "blacklist":
             from src.tools.admin_tools import update_status
+
             status = UserStatus.BLACKLISTED
             user.status = status
             user.save()
@@ -98,6 +102,7 @@ class EditUserModal(ModalScreen):
             self.dismiss()
         elif event.button.id == "kick":
             from src.database.models import Task
+
             count = Task.delete().where(Task.user == user).execute()
             user.delete_instance()
             logger.warning(f"User {self.user_id} manual KICK (deleted {count} tasks)")
@@ -106,11 +111,12 @@ class EditUserModal(ModalScreen):
         elif event.button.id == "cancel":
             self.dismiss()
 
+
 class EditTaskModal(ModalScreen):
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("up", "manual_focus_previous", "Previous"),
-        ("down", "manual_focus_next", "Next")
+        ("down", "manual_focus_next", "Next"),
     ]
 
     def action_manual_focus_previous(self):
@@ -128,10 +134,13 @@ class EditTaskModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         from src.database.models import Task
+
         task = Task.get_or_none(Task.id == self.task_id)
 
         title = task.title if task else ""
-        deadline = task.deadline.strftime("%Y-%m-%d %H:%M") if task and task.deadline else ""
+        deadline = (
+            task.deadline.strftime("%Y-%m-%d %H:%M") if task and task.deadline else ""
+        )
         priority = task.priority if task else "MEDIUM"
 
         with Container(classes="modal"):
@@ -150,53 +159,56 @@ class EditTaskModal(ModalScreen):
             yield Button("Cancel", id="cancel", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-         from src.database.models import Task
-         from datetime import datetime
+        from src.database.models import Task
+        from datetime import datetime
 
-         task = Task.get_or_none(Task.id == self.task_id)
+        task = Task.get_or_none(Task.id == self.task_id)
 
-         if not task:
-             self.dismiss()
-             return
+        if not task:
+            self.dismiss()
+            return
 
-         if event.button.id == "save":
-             task.title = self.query_one("#title", Input).value
-             task.priority = self.query_one("#priority", Input).value.upper()
+        if event.button.id == "save":
+            task.title = self.query_one("#title", Input).value
+            task.priority = self.query_one("#priority", Input).value.upper()
 
-             deadline_str = self.query_one("#deadline", Input).value
-             if deadline_str.strip():
-                 try:
-                     task.deadline = datetime.strptime(deadline_str, "%Y-%m-%d %H:%M")
-                 except:
-                     self.app.notify("Invalid Deadline Format. Use YYYY-MM-DD HH:MM")
-                     return
-             else:
-                 task.deadline = None
+            deadline_str = self.query_one("#deadline", Input).value
+            if deadline_str.strip():
+                try:
+                    task.deadline = datetime.strptime(deadline_str, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    self.app.notify("Invalid Deadline Format. Use YYYY-MM-DD HH:MM")
+                    return
+            else:
+                task.deadline = None
 
-             task.save()
-             logger.info(f"Task {self.task_id} manual update: title='{task.title}' status={task.status}")
-             self.app.notify(f"Task {self.task_id} Updated")
-             self.dismiss()
+            task.save()
+            logger.info(
+                f"Task {self.task_id} manual update: title='{task.title}' status={task.status}"
+            )
+            self.app.notify(f"Task {self.task_id} Updated")
+            self.dismiss()
 
-         elif event.button.id == "complete":
-             task.status = TaskStatus.COMPLETED
-             task.save()
-             logger.info(f"Task {self.task_id} manually marked COMPLETED")
-             self.app.notify(f"Task {self.task_id} Completed")
-             self.dismiss()
-         elif event.button.id == "pending":
-             task.status = TaskStatus.PENDING
-             task.save()
-             logger.info(f"Task {self.task_id} manually marked PENDING")
-             self.app.notify(f"Task {self.task_id} Pending")
-             self.dismiss()
-         elif event.button.id == "delete":
-             task.delete_instance()
-             logger.info(f"Task {self.task_id} manually DELETED")
-             self.app.notify(f"Task {self.task_id} Deleted")
-             self.dismiss()
-         elif event.button.id == "cancel":
-             self.dismiss()
+        elif event.button.id == "complete":
+            task.status = TaskStatus.COMPLETED
+            task.save()
+            logger.info(f"Task {self.task_id} manually marked COMPLETED")
+            self.app.notify(f"Task {self.task_id} Completed")
+            self.dismiss()
+        elif event.button.id == "pending":
+            task.status = TaskStatus.PENDING
+            task.save()
+            logger.info(f"Task {self.task_id} manually marked PENDING")
+            self.app.notify(f"Task {self.task_id} Pending")
+            self.dismiss()
+        elif event.button.id == "delete":
+            task.delete_instance()
+            logger.info(f"Task {self.task_id} manually DELETED")
+            self.app.notify(f"Task {self.task_id} Deleted")
+            self.dismiss()
+        elif event.button.id == "cancel":
+            self.dismiss()
+
 
 class DatabaseMonitor(App):
     CSS = """
@@ -238,7 +250,7 @@ class DatabaseMonitor(App):
         ("left", "previous_tab", "Prev Tab"),
         ("right", "next_tab", "Next Tab"),
         ("up", "scroll_up", "Up"),
-        ("down", "scroll_down", "Down")
+        ("down", "scroll_down", "Down"),
     ]
 
     def _activate_tab(self, tab_id: str):
@@ -248,7 +260,7 @@ class DatabaseMonitor(App):
         table = self.query_one(table_id, DataTable)
         table.focus()
         if table.row_count > 0:
-             table.move_cursor(row=0)
+            table.move_cursor(row=0)
 
     def action_previous_tab(self):
         self._activate_tab("users_tab")
@@ -289,15 +301,9 @@ class DatabaseMonitor(App):
     def __init__(self):
         super().__init__()
         # Cache for diffing: table_name -> id -> {field: value}
-        self.data_cache = {
-             "users": {},
-             "tasks": {}
-        }
+        self.data_cache = {"users": {}, "tasks": {}}
         # Highlight tracker: table_name -> id -> field -> timestamp
-        self.highlights = {
-             "users": {},
-             "tasks": {}
-        }
+        self.highlights = {"users": {}, "tasks": {}}
         self.is_first_refresh = True
 
     def compose(self) -> ComposeResult:
@@ -315,7 +321,14 @@ class DatabaseMonitor(App):
         # Setup Tables
         users_table = self.query_one("#users_table", DataTable)
         users_table.cursor_type = "row"
-        users_table.add_columns("Telegram ID", "Username", "First Name", "Last Name", "Status", "Notif. Time")
+        users_table.add_columns(
+            "Telegram ID",
+            "Username",
+            "First Name",
+            "Last Name",
+            "Status",
+            "Notif. Time",
+        )
 
         tasks_table = self.query_one("#tasks_table", DataTable)
         tasks_table.cursor_type = "row"
@@ -353,40 +366,53 @@ class DatabaseMonitor(App):
 
         current_data = {}
         for user in users_query:
-            current_data[user['telegram_id']] = {
-                "Telegram ID": str(user['telegram_id']),
-                "Username": user['username'] or "-",
-                "First Name": user['first_name'] or "-",
-                "Last Name": user['last_name'] or "-",
-                "Status": user['status'],
-                "Notif. Time": str(user['notification_time'])
+            current_data[user["telegram_id"]] = {
+                "Telegram ID": str(user["telegram_id"]),
+                "Username": user["username"] or "-",
+                "First Name": user["first_name"] or "-",
+                "Last Name": user["last_name"] or "-",
+                "Status": user["status"],
+                "Notif. Time": str(user["notification_time"]),
             }
 
-        self._update_table(table, "users", current_data, ["Telegram ID", "Username", "First Name", "Last Name", "Status", "Notif. Time"])
+        self._update_table(
+            table,
+            "users",
+            current_data,
+            [
+                "Telegram ID",
+                "Username",
+                "First Name",
+                "Last Name",
+                "Status",
+                "Notif. Time",
+            ],
+        )
 
     def update_tasks(self):
         table = self.query_one("#tasks_table", DataTable)
 
         # Joins to get username
-        tasks_data = []
         # Peewee select with join
         query = Task.select(Task, User).join(User)
 
         current_data = {}
 
         try:
-             # Helper for priority
-             priority_map = {
-                 "LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🟠", "URGENT": "🔴"
-             }
+            # Helper for priority
+            priority_map = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🟠", "URGENT": "🔴"}
 
-             for t in query:
-                user_str = f"{t.user.username}" if t.user.username else f"{t.user.first_name} {t.user.last_name}"
+            for t in query:
+                user_str = (
+                    f"{t.user.username}"
+                    if t.user.username
+                    else f"{t.user.first_name} {t.user.last_name}"
+                )
                 # Handle case where all are None
                 if user_str.strip() == "None None":
                     user_str = str(t.user.telegram_id)
                 elif user_str.strip() == "None":
-                     user_str = str(t.user.telegram_id)
+                    user_str = str(t.user.telegram_id)
 
                 prio = priority_map.get(t.priority, t.priority)
                 deadline = t.deadline.strftime("%Y-%m-%d %H:%M") if t.deadline else "-"
@@ -397,15 +423,22 @@ class DatabaseMonitor(App):
                     "Title": t.title,
                     "Priority": prio,
                     "Deadline": deadline,
-                    "Status": t.status
+                    "Status": t.status,
                 }
         except Exception as e:
             # self.notify(str(e)) # Debug
             return
 
-        self._update_table(table, "tasks", current_data, ["ID", "User", "Title", "Deadline", "Priority", "Status"])
+        self._update_table(
+            table,
+            "tasks",
+            current_data,
+            ["ID", "User", "Title", "Deadline", "Priority", "Status"],
+        )
 
-    def _update_table(self, table: DataTable, table_name: str, current_data: dict, columns: list):
+    def _update_table(
+        self, table: DataTable, table_name: str, current_data: dict, columns: list
+    ):
         """
         Generic update logic with diffing and highlighting.
         """
@@ -421,11 +454,11 @@ class DatabaseMonitor(App):
         current_ids = set(current_data.keys())
 
         for deleted_id in cached_ids - current_ids:
-             if table.is_valid_row_index(table.get_row_index(str(deleted_id))):
-                 table.remove_row(str(deleted_id))
-             del cache[deleted_id]
-             if deleted_id in highlights:
-                 del highlights[deleted_id]
+            if table.is_valid_row_index(table.get_row_index(str(deleted_id))):
+                table.remove_row(str(deleted_id))
+            del cache[deleted_id]
+            if deleted_id in highlights:
+                del highlights[deleted_id]
 
         # Check for new or updated rows
         for row_id, new_row in current_data.items():
@@ -442,7 +475,10 @@ class DatabaseMonitor(App):
                 # Add row
                 # Initially highlighted only if NOT first refresh
                 is_initially_highlighted = not self.is_first_refresh
-                rendered_cells = [self._render_cell(new_row[col], is_initially_highlighted) for col in columns]
+                rendered_cells = [
+                    self._render_cell(new_row[col], is_initially_highlighted)
+                    for col in columns
+                ]
                 table.add_row(*rendered_cells, key=str_id)
             else:
                 # EXISTING ROW
@@ -450,7 +486,8 @@ class DatabaseMonitor(App):
                 changes_found = False
 
                 # Update highlights timestamp if changed
-                if row_id not in highlights: highlights[row_id] = {}
+                if row_id not in highlights:
+                    highlights[row_id] = {}
 
                 for col in columns:
                     if old_row.get(col) != new_row.get(col):
@@ -473,34 +510,46 @@ class DatabaseMonitor(App):
 
                 # Also check expirations
                 for col, ts in list(row_highlights.items()):
-                     if now - ts <= HIGHLIGHT_DURATION:
-                         should_refresh_row = True # It is highlighted, so we keep refreshing to eventually catch expiration?
-                                                   # Actually, we rely on polling.
-                     else:
-                         # Expired. If it was just expired, we need one last refresh to clear it.
-                         # We can just remove it from dict?
-                         # Only if we know it was previously highlighted.
-                         # Simple approach: Always update cell if it is in highlights dict.
-                         # If it expires, remove from dict.
-                         should_refresh_row = True
-                         del row_highlights[col]
+                    if now - ts <= HIGHLIGHT_DURATION:
+                        should_refresh_row = True  # It is highlighted, so we keep refreshing to eventually catch expiration?
+                        # Actually, we rely on polling.
+                    else:
+                        # Expired. If it was just expired, we need one last refresh to clear it.
+                        # We can just remove it from dict?
+                        # Only if we know it was previously highlighted.
+                        # Simple approach: Always update cell if it is in highlights dict.
+                        # If it expires, remove from dict.
+                        should_refresh_row = True
+                        del row_highlights[col]
 
                 if should_refresh_row:
                     column_keys = list(table.columns.keys())
 
                     for i, col in enumerate(columns):
                         ts = row_highlights.get(col, 0)
-                        is_highlighted = (now - ts <= HIGHLIGHT_DURATION)
+                        is_highlighted = now - ts <= HIGHLIGHT_DURATION
 
                         val = new_row[col]
                         # Special formatting for Status if tasks or users
                         if col == "Status":
-                             if table_name == "tasks":
-                                 status_style = "green" if val == TaskStatus.COMPLETED else "yellow" if val == TaskStatus.PENDING else "dim"
-                                 val = f"[{status_style}]{val}[/{status_style}]"
-                             elif table_name == "users":
-                                 status_style = "green" if val == UserStatus.WHITELISTED else "red" if val == UserStatus.BLACKLISTED else "yellow"
-                                 val = f"[{status_style}]{val}[/{status_style}]"
+                            if table_name == "tasks":
+                                status_style = (
+                                    "green"
+                                    if val == TaskStatus.COMPLETED
+                                    else "yellow"
+                                    if val == TaskStatus.PENDING
+                                    else "dim"
+                                )
+                                val = f"[{status_style}]{val}[/{status_style}]"
+                            elif table_name == "users":
+                                status_style = (
+                                    "green"
+                                    if val == UserStatus.WHITELISTED
+                                    else "red"
+                                    if val == UserStatus.BLACKLISTED
+                                    else "yellow"
+                                )
+                                val = f"[{status_style}]{val}[/{status_style}]"
 
                         rendered = self._render_cell(val, is_highlighted)
                         table.update_cell(str_id, column_keys[i], rendered)
@@ -514,6 +563,7 @@ class DatabaseMonitor(App):
         if highlighted:
             text.style = "bold white on red"
         return text
+
 
 if __name__ == "__main__":
     app = DatabaseMonitor()

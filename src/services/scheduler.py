@@ -7,6 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 task_manager = TaskManager()
 
+
 async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
     """
     Sends a weekly summary to all users.
@@ -20,12 +21,15 @@ async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
         if tasks:
             summary = "📅 *Resumen Semanal de Tareas*:\n\n"
             for task in tasks:
-                 summary += format_task_es(task)
+                summary += format_task_es(task)
 
             try:
-                await context.bot.send_message(chat_id=user.telegram_id, text=summary, parse_mode="Markdown")
+                await context.bot.send_message(
+                    chat_id=user.telegram_id, text=summary, parse_mode="Markdown"
+                )
             except Exception as e:
                 logger.error(f"Failed to send summary to {user.telegram_id}: {e}")
+
 
 async def send_pending_alert(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -40,17 +44,22 @@ async def send_pending_alert(context: ContextTypes.DEFAULT_TYPE):
         if tasks:
             summary = "⚠️ *Tienes tareas pendientes para cerrar la semana*:\n\n"
             for task in tasks:
-                 deadline_str = f" (Vence: {format_datetime_es(task.deadline)})" if task.deadline else ""
-                 summary += f"• {task.title}{deadline_str}\n"
+                deadline_str = (
+                    f" (Vence: {format_datetime_es(task.deadline)})"
+                    if task.deadline
+                    else ""
+                )
+                summary += f"• {task.title}{deadline_str}\n"
 
             try:
                 await context.bot.send_message(
                     chat_id=user.telegram_id,
                     text=summary + "\n¡Ánimo! 💪",
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
                 )
             except Exception as e:
                 logger.error(f"Failed to send pending alert to {user.telegram_id}: {e}")
+
 
 async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -60,12 +69,16 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
     # Alert if deadline is within the next 1 hour
     time_threshold = now + timedelta(hours=1)
 
-    upcoming_tasks = Task.select().join(User).where(
-        (Task.status == 'PENDING') &
-        (Task.deadline.is_null(False)) &
-        (Task.deadline > now) &
-        (Task.deadline <= time_threshold) &
-        (Task.reminder_sent == False)
+    upcoming_tasks = (
+        Task.select()
+        .join(User)
+        .where(
+            (Task.status == "PENDING")
+            & (Task.deadline.is_null(False))
+            & (Task.deadline > now)
+            & (Task.deadline <= time_threshold)
+            & (Task.reminder_sent == False)
+        )
     )
 
     for task in upcoming_tasks:
@@ -73,7 +86,7 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=task.user.telegram_id,
                 text=f"⏰ *Recordatorio*: ¡La tarea *{task.title}* vence pronto!\nFecha límite: {task.deadline}",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             # Mark as sent
             task.reminder_sent = True

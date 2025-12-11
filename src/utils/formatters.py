@@ -1,15 +1,24 @@
 from datetime import datetime, timedelta
-import pytz
 
-PRIORITY_MAP = {
-    "LOW": "🟢",
-    "MEDIUM": "🟡",
-    "HIGH": "🟠",
-    "URGENT": "🔴"
-}
+PRIORITY_MAP = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🟠", "URGENT": "🔴"}
 
 DAYS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-MONTHS_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+MONTHS_ES = [
+    "",
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+]
+
 
 def format_datetime_es(dt: datetime) -> str:
     """
@@ -39,6 +48,7 @@ def format_datetime_es(dt: datetime) -> str:
 
     time_str = dt.strftime("%H:%M")
     return f"{day_str} a las {time_str}"
+
 
 def format_task_es(task) -> str:
     """

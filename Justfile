@@ -24,7 +24,14 @@ push:
     docker compose push
 
 # Build and push
-ship: build push
+ship: format check build push
+
+# Formatter & Linter
+check:
+    uv run ruff check src
+
+format:
+    uv run ruff format src
 
 # Run locally without Docker
 run:

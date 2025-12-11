@@ -10,7 +10,7 @@ from src.bot.handlers import (
     handle_voice,
     list_tasks_command,
     complete_task_command,
-    cancel_task_command
+    cancel_task_command,
 )
 
 # Enable logging
@@ -21,6 +21,7 @@ logging.basicConfig(
 # Silence httpx logger
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 def main():
     """Start the bot."""
@@ -43,7 +44,9 @@ def main():
     application.add_handler(CommandHandler("cancel", cancel_task_command))
 
     # Text messages
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+    )
 
     # Voice messages
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
@@ -51,21 +54,30 @@ def main():
     # 5. Setup Scheduler
     job_queue = application.job_queue
     if job_queue:
-        from src.services.scheduler import send_weekly_summary, check_deadlines_job, send_pending_alert
+        from src.services.scheduler import (
+            send_weekly_summary,
+            check_deadlines_job,
+            send_pending_alert,
+        )
         from datetime import time
         import pytz
 
         # Weekly summary every Monday at 8:00 AM
-        job_queue.run_daily(send_weekly_summary, time=time(hour=8, minute=0), days=(1,)) # 1 = Monday
+        job_queue.run_daily(
+            send_weekly_summary, time=time(hour=8, minute=0), days=(1,)
+        )  # 1 = Monday
 
         # Pending alert every Friday at 8:00 AM
-        job_queue.run_daily(send_pending_alert, time=time(hour=8, minute=0), days=(5,)) # 5 = Friday
+        job_queue.run_daily(
+            send_pending_alert, time=time(hour=8, minute=0), days=(5,)
+        )  # 5 = Friday
 
         # Check deadlines every 5 minutes
         job_queue.run_repeating(check_deadlines_job, interval=300, first=10)
 
     # 6. Start Polling
     application.run_polling()
+
 
 if __name__ == "__main__":
     main()

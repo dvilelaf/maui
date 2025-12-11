@@ -3,6 +3,7 @@ import os
 
 DB_PATH = "maui.db"
 
+
 def migrate():
     if not os.path.exists(DB_PATH):
         print(f"Database {DB_PATH} not found.")
@@ -21,7 +22,9 @@ def migrate():
         else:
             print("Adding 'status' column to 'user' table...")
             # Default value matches UserStatus.PENDING ("PENDING")
-            cursor.execute("ALTER TABLE user ADD COLUMN status VARCHAR(255) DEFAULT 'PENDING'")
+            cursor.execute(
+                "ALTER TABLE user ADD COLUMN status VARCHAR(255) DEFAULT 'PENDING'"
+            )
             conn.commit()
             print("Migration successful.")
 
@@ -29,6 +32,7 @@ def migrate():
         print(f"Error during migration: {e}")
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     migrate()
