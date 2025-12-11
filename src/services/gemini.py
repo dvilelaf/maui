@@ -47,7 +47,7 @@ class GeminiService:
         """
         from datetime import datetime
         import time
-        from google.api_core.exceptions import InternalServerError, ServiceUnavailable
+        from google.api_core.exceptions import InternalServerError, ServiceUnavailable, ResourceExhausted
 
         current_time = datetime.now().isoformat()
         system_instruction = self._get_system_prompt().format(current_time=current_time)
@@ -81,6 +81,16 @@ class GeminiService:
                         reasoning="El servicio de IA no está disponible en este momento. Inténtalo más tarde."
                     )
                 time.sleep(1 * (attempt+1)) # Exponential-ish backoff
+
+            except ResourceExhausted as e:
+                self.logger.warning(f"Gemini Policy Violation/Quota Exceeded: {e}")
+                from src.utils.schema import UserIntent
+                # Do not retry, just fail gracefully.
+                return TaskExtractionResponse(
+                    is_relevant=False,
+                    intent=UserIntent.UNKNOWN,
+                    reasoning="He alcanzado mi límite de uso diario de IA. Por favor, inténtalo de nuevo mañana o verifica la configuración de cuotas."
+                )
 
             except Exception as e:
                 self.logger.error(f"Error processing input with Gemini: {e}")
