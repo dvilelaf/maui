@@ -9,8 +9,10 @@ import logging
 class GeminiService:
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
+        # Use first model as default
+        default_model = getattr(Config, "GEMINI_MODELS", ["gemini-2.5-flash"])[0]
         self.model = genai.GenerativeModel(
-            model_name=Config.GEMINI_MODEL,
+            model_name=default_model,
             generation_config={"response_mime_type": "application/json"}
         )
         self.logger = logging.getLogger(__name__)
@@ -53,54 +55,60 @@ class GeminiService:
         system_instruction = self._get_system_prompt().format(current_time=current_time)
 
         max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                prompt_parts = [system_instruction]
+        # Use models from config, defaulting to single model if list missing
+        models_to_try = getattr(Config, "GEMINI_MODELS", ["gemini-2.5-flash"])
 
-                if mime_type.startswith("audio/"):
-                    prompt_parts.append({
-                        "mime_type": mime_type,
-                        "data": user_input
-                    })
-                    prompt_parts.append("Please transcribe this audio and extract the task details.")
-                else:
-                    prompt_parts.append(user_input)
+        for model_name in models_to_try:
+            # Re-configure model for this attempt
+            self.model = genai.GenerativeModel(
+                model_name=model_name,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            self.logger.info(f"Attempting with model: {model_name}")
 
-                response = self.model.generate_content(prompt_parts)
-                self.logger.info(f"Gemini Raw Response: {response.text}")
+            for attempt in range(max_retries):
+                try:
+                    prompt_parts = [system_instruction]
 
-                return TaskExtractionResponse.model_validate_json(response.text)
+                    if mime_type.startswith("audio/"):
+                        prompt_parts.append({
+                            "mime_type": mime_type,
+                            "data": user_input
+                        })
+                        prompt_parts.append("Please transcribe this audio and extract the task details.")
+                    else:
+                        prompt_parts.append(user_input)
 
-            except (InternalServerError, ServiceUnavailable) as e:
-                self.logger.warning(f"Gemini API error (attempt {attempt+1}/{max_retries}): {e}")
-                if attempt == max_retries - 1:
-                     from src.utils.schema import UserIntent
-                     return TaskExtractionResponse(
-                        is_relevant=False,
-                        intent=UserIntent.UNKNOWN,
-                        reasoning="El servicio de IA no está disponible en este momento. Inténtalo más tarde."
-                    )
-                time.sleep(1 * (attempt+1)) # Exponential-ish backoff
+                    response = self.model.generate_content(prompt_parts)
+                    self.logger.info(f"Gemini Raw Response: {response.text}")
 
-            except ResourceExhausted as e:
-                self.logger.warning(f"Gemini Policy Violation/Quota Exceeded: {e}")
-                from src.utils.schema import UserIntent
-                # Do not retry, just fail gracefully.
-                return TaskExtractionResponse(
-                    is_relevant=False,
-                    intent=UserIntent.UNKNOWN,
-                    reasoning="He alcanzado mi límite de uso diario de IA. Por favor, inténtalo de nuevo mañana o verifica la configuración de cuotas."
-                )
+                    return TaskExtractionResponse.model_validate_json(response.text)
 
-            except Exception as e:
-                self.logger.error(f"Error processing input with Gemini: {e}")
-                from src.utils.schema import UserIntent
-                return TaskExtractionResponse(
-                    is_relevant=False,
-                    intent=UserIntent.UNKNOWN,
-                    reasoning="Hubo un error técnico al procesar tu solicitud."
-                )
+                except (InternalServerError, ServiceUnavailable) as e:
+                    self.logger.warning(f"Gemini API error (model {model_name}, attempt {attempt+1}/{max_retries}): {e}")
+                    if attempt == max_retries - 1:
+                        # If this was the last retry for this model, break internal loop to try next model?
+                        # No, InternalServerError might be transient for this model/region.
+                        # But if we exhaust retries here, we could try next model.
+                        # Let's break to outer loop to try next model if available.
+                        break
+                    time.sleep(1 * (attempt+1)) # Exponential-ish backoff
 
-        # Should not reach here normally
+                except ResourceExhausted as e:
+                    self.logger.warning(f"Gemini Quota Exceeded for {model_name}: {e}")
+                    # Break inner loop immediately to rotate to next model
+                    break
+
+                except Exception as e:
+                    self.logger.error(f"Error processing input with Gemini ({model_name}): {e}")
+                    # For generic errors, maybe safer to abort or try next?
+                    # Let's try next model just in case.
+                    break
+
+        # If we exhausted all models and retries
         from src.utils.schema import UserIntent
-        return TaskExtractionResponse(is_relevant=False, intent=UserIntent.UNKNOWN, reasoning="Error desconocido.")
+        return TaskExtractionResponse(
+            is_relevant=False,
+            intent=UserIntent.UNKNOWN,
+            reasoning="Lo siento, he tenido problemas con todos mis modelos de lenguaje. Por favor inténtalo más tarde."
+        )
