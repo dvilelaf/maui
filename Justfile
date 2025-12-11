@@ -30,3 +30,11 @@ ship: build push
 run:
     uv sync
     uv run python src/main.py
+
+# Run the tests
+test:
+    uv run pytest
+
+# View Database contents
+db:
+    uv run python src/tools/inspect_db.py

@@ -33,10 +33,25 @@ class TaskManager:
 
     @staticmethod
     def get_pending_tasks(user_id: int) -> List[Task]:
-        return list(Task.select().where(
+        tasks = list(Task.select().where(
             (Task.user == user_id) &
             (Task.status == "PENDING")
-        ).order_by(Task.deadline.asc(), Task.priority.desc()))
+        ))
+
+        # Sort logic:
+        # 1. Deadline: Ascending (Earnest first). None goes to LAST (using datetime.max)
+        # 2. Priority: URGENT > HIGH > MEDIUM > LOW
+
+        priority_order = {"URGENT": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+
+        def sort_key(t):
+            deadline_val = t.deadline if t.deadline else datetime.max
+            priority_val = priority_order.get(t.priority, 99)
+            return (deadline_val, priority_val)
+
+        tasks.sort(key=sort_key)
+
+        return tasks
 
     @staticmethod
     def get_task_by_id(task_id: int) -> Optional[Task]:

@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.5.3",
     "python-dotenv>=1.0.0",
     "pytz>=2023.3",
+    "rich>=13.0.0",
+    "textual>=0.47.0",
 ]
 
 [build-system]
