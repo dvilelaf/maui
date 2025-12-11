@@ -47,12 +47,15 @@ def main():
     # 5. Setup Scheduler
     job_queue = application.job_queue
     if job_queue:
-        from src.services.scheduler import send_weekly_summary, check_deadlines_job
+        from src.services.scheduler import send_weekly_summary, check_deadlines_job, send_pending_alert
         from datetime import time
         import pytz
 
-        # Weekly summary every Monday at 9:00 AM UTC (or local if configured, defaulting to UTC for simplicity)
-        job_queue.run_daily(send_weekly_summary, time=time(hour=9, minute=0), days=(1,)) # 1 = Monday
+        # Weekly summary every Monday at 8:00 AM
+        job_queue.run_daily(send_weekly_summary, time=time(hour=8, minute=0), days=(1,)) # 1 = Monday
+
+        # Pending alert every Friday at 8:00 AM
+        job_queue.run_daily(send_pending_alert, time=time(hour=8, minute=0), days=(5,)) # 5 = Friday
 
         # Check deadlines every 5 minutes
         job_queue.run_repeating(check_deadlines_job, interval=300, first=10)
