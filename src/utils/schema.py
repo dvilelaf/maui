@@ -29,7 +29,7 @@ class TaskSchema(BaseModel):
 class TaskExtractionResponse(BaseModel):
     is_relevant: bool = Field(description="True if the user input describes a task interaction.")
     intent: UserIntent = Field(description="The intent of the user.")
-    time_filter: Optional[str] = Field(None, description="For QUERY_TASKS: 'TODAY', 'WEEK', 'MONTH', or 'ALL'. Defaults to 'ALL' if unspecified.")
+    time_filter: Optional[str] = Field(None, description="For QUERY_TASKS: 'TODAY', 'WEEK', 'MONTH', 'YEAR', or 'ALL'. Defaults to 'ALL' if unspecified.")
     formatted_task: Optional[TaskSchema] = Field(None, description="The extracted task details (for ADD or EDIT).")
     target_search_term: Optional[str] = Field(None, description="Key phrase to find the existing task (for EDIT/CANCEL/COMPLETE).")
     reasoning: Optional[str] = Field(None, description="If UNKNOWN or ambiguous, explain why.")

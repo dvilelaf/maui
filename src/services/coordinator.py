@@ -55,6 +55,7 @@ class Coordinator:
                     "TODAY": "para hoy",
                     "WEEK": "para esta semana",
                     "MONTH": "para este mes",
+                    "YEAR": "para este año",
                     "ALL": "pendientes"
                 }.get(time_filter, "pendientes")
 
@@ -115,6 +116,7 @@ class Coordinator:
             "TODAY": "para hoy",
             "WEEK": "para esta semana",
             "MONTH": "para este mes",
+            "YEAR": "para este año",
             "ALL": "pendientes"
         }.get(time_filter, "pendientes")
 

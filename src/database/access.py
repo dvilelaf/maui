@@ -54,6 +54,11 @@ class TaskManager:
             end_of_month = now + timedelta(days=30)
             query &= (Task.deadline <= end_of_month)
 
+        elif time_filter == "YEAR":
+             # Deadline <= Now + 365 days
+            end_of_year = now + timedelta(days=365)
+            query &= (Task.deadline <= end_of_year)
+
         tasks = list(Task.select().where(query))
 
         # Sort logic:
@@ -104,6 +109,10 @@ class TaskManager:
         elif time_filter == "MONTH":
             end_of_month = now + timedelta(days=30)
             query &= (Task.deadline <= end_of_month)
+
+        elif time_filter == "YEAR":
+            end_of_year = now + timedelta(days=365)
+            query &= (Task.deadline <= end_of_year)
 
         return Task.delete().where(query).execute()
 

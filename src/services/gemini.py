@@ -29,7 +29,7 @@ class GeminiService:
         Output matching the JSON schema:
         - 'intent': One of the above.
         - 'is_relevant': True for all except UNKNOWN.
-        - 'time_filter': For QUERY_TASKS, CANCEL_TASK, and COMPLETE_TASK. Values: 'TODAY' (until tonight 23:59), 'WEEK' (next 7 days), 'MONTH' (next 30 days), 'ALL' (everything). Default to 'ALL' if no specific time mentions.
+        - 'time_filter': For QUERY_TASKS, CANCEL_TASK, and COMPLETE_TASK. Values: 'TODAY' (until tonight 23:59), 'WEEK' (next 7 days), 'MONTH' (next 30 days), 'YEAR' (next 365 days), 'ALL' (everything). Default to 'ALL' if no specific time mentions.
         - 'target_search_term': For CANCEL/COMPLETE/EDIT, providing the KEYWORDS to find the task (e.g., "milk", "calling mom", "meeting"). IMPORTANT: If the user wants to cancel/complete ALL tasks (e.g., "cancel everything", "delete all tasks"), set this to "ALL".
         - 'formatted_task':
           - For ADD_TASK: A JSON OBJECT containing full details. Keys: "title" (required), "description", "priority", "deadline".
