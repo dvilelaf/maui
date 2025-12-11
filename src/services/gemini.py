@@ -29,12 +29,15 @@ class GeminiService:
         Output matching the JSON schema:
         - 'intent': One of the above.
         - 'is_relevant': True for all except UNKNOWN.
-        - 'time_filter': For QUERY_TASKS, CANCEL_TASK, and COMPLETE_TASK. Values: 'TODAY' (until tonight 23:59), 'WEEK' (next 7 days), 'MONTH' (next 30 days), 'YEAR' (next 365 days), 'ALL' (everything). Default to 'ALL' if no specific time mentions.
-        - 'target_search_term': For CANCEL/COMPLETE/EDIT, providing the KEYWORDS to find the task (e.g., "milk", "calling mom", "meeting"). IMPORTANT: If the user wants to cancel/complete ALL tasks (e.g., "cancel everything", "delete all tasks"), set this to "ALL".
+        - 'time_filter': For QUERY_TASKS, CANCEL_TASK, and COMPLETE_TASK. Values: 'TODAY', 'WEEK', 'MONTH', 'YEAR', 'ALL'. Default to 'ALL'.
+        - 'priority_filter': For QUERY_TASKS. Values: 'LOW', 'MEDIUM', 'HIGH', 'URGENT'. Only if user explicitly asks (e.g., "high priority tasks").
+        - 'target_search_term':
+            - For CANCEL/COMPLETE/EDIT: Key phrase to find the task.
+            - If user says "I bought bread" or "Mark buying bread as done", the target is "buying bread" or "bread".
+            - If "cancel everything", set to "ALL".
         - 'formatted_task':
-          - For ADD_TASK: A JSON OBJECT containing full details. Keys: "title" (required), "description", "priority", "deadline".
-            - "deadline": If user specifies a date BUT NO TIME (e.g. "today", "tomorrow", "next friday"), set time to 23:59:59. Example: "2025-10-10T23:59:59".
-          - For EDIT_TASK: A JSON OBJECT containing only the changed fields. NEVER a string.
+          - For ADD_TASK: Full details. "deadline": if date w/o time, set to 23:59:59.
+          - For EDIT_TASK: Changed fields only.
 
         If UNKNOWN, provide reasoning in Spanish.
 
