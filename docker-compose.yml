@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  maui-bot:
+    build: .
+    container_name: maui_bot
+    restart: unless-stopped
+    volumes:
+      - ./src:/app/src # For development (hot reload not native but useful for inspection)
+      - ./maui.db:/app/maui.db # Persist database
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
