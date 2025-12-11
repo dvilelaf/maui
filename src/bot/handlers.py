@@ -12,13 +12,25 @@ coordinator = Coordinator()
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a welcome message when the command /start is issued."""
     user = update.effective_user
+    # Ensure user is in DB
+    user_db = coordinator.user_manager.get_or_create_user(user.id, user.username)
+
+    from src.utils.schema import UserStatus
+    if user_db.status == UserStatus.PENDING:
+        await update.message.reply_text(
+            f"¡Hola {user.first_name}! 👋\n\n"
+            "Gracias por registrarte. Tu solicitud de acceso ha sido enviada a los administradores. "
+            "Recibirás una notificación cuando tu cuenta sea aprobada."
+        )
+        return
+    elif user_db.status == UserStatus.BLACKLISTED:
+        return # Ignore
+
     await update.message.reply_html(
         f"¡Hola {user.mention_html()}! Soy Maui, tu asistente de tareas inteligente. 🌴\n"
         f"Simplemente envíame un mensaje (texto o voz) describiendo lo que necesitas hacer, "
         f"y yo lo organizaré por ti."
     )
-    # Ensure user is in DB
-    coordinator.user_manager.get_or_create_user(user.id, user.username)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a help message when the command /help is issued."""

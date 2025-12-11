@@ -38,3 +38,12 @@ test:
 # View Database contents
 db:
     uv run python src/tools/inspect_db.py
+
+# Whitelist a user
+# Whitelist a user (ID, @username, or 'all')
+whitelist target:
+    uv run python src/tools/admin_tools.py whitelist {{target}}
+
+# Blacklist a user (ID, @username, or 'all')
+blacklist target:
+    uv run python src/tools/admin_tools.py blacklist {{target}}

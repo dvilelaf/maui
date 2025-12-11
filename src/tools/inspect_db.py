@@ -11,7 +11,7 @@ import time
 from src.database.core import db, init_db
 from src.database.models import User, Task
 from src.utils.config import Config
-from src.utils.schema import TaskStatus
+from src.utils.schema import TaskStatus, UserStatus
 
 # Highlight duration in seconds
 HIGHLIGHT_DURATION = 5.0
@@ -64,7 +64,7 @@ class DatabaseMonitor(App):
         # Setup Tables
         users_table = self.query_one("#users_table", DataTable)
         users_table.cursor_type = "row"
-        users_table.add_columns("Telegram ID", "Username", "Notif. Time")
+        users_table.add_columns("Telegram ID", "Username", "Status", "Notif. Time")
 
         tasks_table = self.query_one("#tasks_table", DataTable)
         tasks_table.cursor_type = "row"
@@ -97,13 +97,14 @@ class DatabaseMonitor(App):
                 row_data = {
                     "Telegram ID": str(user.telegram_id),
                     "Username": user.username or "-",
+                    "Status": user.status,
                     "Notif. Time": str(user.notification_time)
                 }
                 current_data[user.telegram_id] = row_data
         except Exception as e:
             return
 
-        self._update_table(table, "users", current_data, ["Telegram ID", "Username", "Notif. Time"])
+        self._update_table(table, "users", current_data, ["Telegram ID", "Username", "Status", "Notif. Time"])
 
     def update_tasks(self):
         table = self.query_one("#tasks_table", DataTable)
@@ -230,10 +231,14 @@ class DatabaseMonitor(App):
                         is_highlighted = (now - ts <= HIGHLIGHT_DURATION)
 
                         val = new_row[col]
-                        # Special formatting for Status if tasks
-                        if col == "Status" and table_name == "tasks":
-                             status_style = "green" if val == TaskStatus.COMPLETED else "yellow" if val == TaskStatus.PENDING else "dim"
-                             val = f"[{status_style}]{val}[/{status_style}]"
+                        # Special formatting for Status if tasks or users
+                        if col == "Status":
+                             if table_name == "tasks":
+                                 status_style = "green" if val == TaskStatus.COMPLETED else "yellow" if val == TaskStatus.PENDING else "dim"
+                                 val = f"[{status_style}]{val}[/{status_style}]"
+                             elif table_name == "users":
+                                 status_style = "green" if val == UserStatus.WHITELISTED else "red" if val == UserStatus.BLACKLISTED else "yellow"
+                                 val = f"[{status_style}]{val}[/{status_style}]"
 
                         rendered = self._render_cell(val, is_highlighted)
                         table.update_cell(str_id, column_keys[i], rendered)

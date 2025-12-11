@@ -27,7 +27,14 @@ class TaskStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
+class UserStatus(str, Enum):
+    PENDING = "PENDING"
+    WHITELISTED = "WHITELISTED"
+    BLACKLISTED = "BLACKLISTED"
+
+
 class TaskSchema(BaseModel):
+
     title: Optional[str] = Field(None, description="The short summary or title of the task")
     description: Optional[str] = Field(None, description="Detailed description of the task, if any")
     priority: Optional[str] = Field("MEDIUM", description="Task priority: LOW, MEDIUM, HIGH, URGENT")

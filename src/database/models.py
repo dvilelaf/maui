@@ -1,7 +1,7 @@
 from peewee import Model, CharField, IntegerField, DateTimeField, ForeignKeyField, TimeField, BooleanField
 from datetime import datetime
 from src.database.core import db
-from src.utils.schema import TaskStatus
+from src.utils.schema import TaskStatus, UserStatus
 
 class BaseModel(Model):
     class Meta:
@@ -12,6 +12,7 @@ class User(BaseModel):
     username = CharField(null=True)
     notification_time = TimeField(default="09:00:00") # Default 9 AM
     reminder_lead_time_minutes = IntegerField(default=60) # Default 1 hour before
+    status = CharField(default=UserStatus.PENDING)
 
 class Task(BaseModel):
     id = IntegerField(primary_key=True) # Peewee AutoField is default for 'id', but we might want explicit control or just let it auto-increment.

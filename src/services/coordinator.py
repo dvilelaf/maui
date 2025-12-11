@@ -19,7 +19,16 @@ class Coordinator:
         from src.utils.schema import UserIntent, TimeFilter, TaskStatus, TARGET_ALL
 
         # Ensure user exists
-        self.user_manager.get_or_create_user(telegram_id=user_id, username=username)
+        user = self.user_manager.get_or_create_user(telegram_id=user_id, username=username)
+
+        # Access Control
+        from src.utils.schema import UserStatus
+        if user.status != UserStatus.WHITELISTED:
+            if user.status == UserStatus.PENDING:
+                return "🔒 Tu cuenta está pendiente de aprobación por el administrador. Te notificaremos cuando tengas acceso."
+            elif user.status == UserStatus.BLACKLISTED:
+                 # Silently ignore or refuse
+                return "⛔ No tienes permiso para usar este bot."
 
         mime_type = "audio/ogg" if is_voice else "text/plain"
 
