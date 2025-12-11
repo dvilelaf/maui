@@ -7,7 +7,8 @@ from src.bot.handlers import (
     help_command,
     handle_message,
     handle_voice,
-    list_tasks_command,
+    get_tasks_command,
+    get_lists_command,
     complete_task_command,
     cancel_task_command,
     add_task_command,
@@ -31,7 +32,8 @@ async def post_init(application: Application):
         BotCommand("start", "Iniciar el bot"),
         BotCommand("help", "Ayuda y ejemplos"),
         BotCommand("add", "Añadir tarea"),
-        BotCommand("list", "Ver tareas pendientes"),
+        BotCommand("tasks", "Ver tareas pendientes"),
+        BotCommand("lists", "Ver listas de tareas"),
         BotCommand("done", "Marcar como completada"),
         BotCommand("delete", "Borrar tarea"),
     ]
@@ -56,8 +58,9 @@ def main():
     # 3. Register Handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("tasks", list_tasks_command))
-    application.add_handler(CommandHandler("list", list_tasks_command))  # Alias
+    application.add_handler(CommandHandler("tasks", get_tasks_command))
+    application.add_handler(CommandHandler("list", get_tasks_command))  # Alias
+    application.add_handler(CommandHandler("lists", get_lists_command))
     application.add_handler(CommandHandler("done", complete_task_command))
     application.add_handler(CommandHandler("cancel", cancel_task_command))
     application.add_handler(CommandHandler("delete", cancel_task_command))  # Alias

@@ -1,11 +1,79 @@
 from datetime import datetime
+from peewee import fn
 from typing import List, Optional
-from src.database.models import User, Task, TaskList, SharedAccess
-from src.utils.schema import TaskSchema, TimeFilter, TaskStatus
 
+import asyncio
 import logging
+from src.utils.schema import TaskSchema, TimeFilter, TaskStatus, UserStatus
+from src.utils.config import Config
+from src.database.models import User, Task, TaskList, SharedAccess
+from telegram import Bot
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+async def notify_user(user_id: int, message: str):
+    """Sends a notification to the user."""
+    try:
+        bot = Bot(token=Config.TELEGRAM_TOKEN)
+        await bot.send_message(chat_id=user_id, text=message)
+        logger.info(f"Notification sent to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send notification to user {user_id}: {e}")
+
+
+def resolve_user(target: str):
+    """Resolve a target string (ID or @username) to a User object."""
+    if target.isdigit():
+        return User.get_or_none(User.telegram_id == int(target))
+    elif target.startswith("@"):
+        username = target[1:]  # Remove @
+        return User.get_or_none(User.username == username)
+    else:
+        # Try as username without @
+        return User.get_or_none(User.username == target)
+
+
+def confirm_action(prompt: str) -> bool:
+    resp = input(f"{prompt} (y/n): ").strip().lower()
+    return resp == "y"
+
+def kick_user(user_id: int):
+    """Deletes a user and their tasks after confirmation."""
+    try:
+        user = User.get_or_none(User.telegram_id == user_id)
+        if not user:
+            print(f"User {user_id} not found.")
+            return
+        if not confirm_action(f"Are you sure you want to delete user {user_id} and all their tasks?"):
+            print("Deletion cancelled.")
+            return
+        # from src.database.models import Task # Already imported above
+        task_count = Task.delete().where(Task.user == user.telegram_id).execute()
+        user.delete_instance()
+        logger.warning(f"User KICKED (Deleted): {user.telegram_id} and {task_count} tasks.")
+        print(f"✅ User {user.telegram_id} (@{user.username}) and their {task_count} tasks have been deleted.")
+    except Exception as e:
+        print(f"Error kicking user {user_id}: {e}")
+
+def update_status(user: User, status: UserStatus):
+    try:
+        user_id = user.telegram_id
+        user.status = status
+        user.save()
+        print(f"User {user_id} ({user.username}) status updated to {status}.")
+        msg = ""
+        if status == UserStatus.WHITELISTED:
+            msg = "✅ ¡Tu cuenta ha sido aprobada! Ya puedes usar Maui para gestionar tus tareas."
+        elif status == UserStatus.BLACKLISTED:
+            msg = "⛔ Tu solicitud de acceso ha sido denegada."
+        if msg:
+            asyncio.run(notify_user(user_id, msg))
+    except Exception as e:
+        print(f"Error updating user status: {e}")
 
 
 class UserManager:
@@ -108,7 +176,11 @@ class TaskManager:
     ) -> List[Task]:
         from datetime import datetime, timedelta
 
-        query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
+        query = (
+            (Task.user == user_id)
+            & (Task.status == TaskStatus.PENDING)
+            & (Task.task_list.is_null())
+        )
 
         now = datetime.now()
 
@@ -172,7 +244,11 @@ class TaskManager:
     ) -> int:
         from datetime import datetime, timedelta
 
-        query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
+        query = (
+            (Task.user == user_id)
+            & (Task.status == TaskStatus.PENDING)
+            & (Task.task_list.is_null())
+        )
 
         now = datetime.now()
 
@@ -216,6 +292,7 @@ class TaskManager:
             Task.select().where(
                 (Task.user == user_id)
                 & (Task.status == TaskStatus.PENDING)
+                & (Task.task_list.is_null())
                 & (
                     (Task.title.contains(keyword))
                     | (Task.description.contains(keyword))
@@ -271,24 +348,79 @@ class TaskManager:
 
     @staticmethod
     def find_list_by_name(user_id: int, name: str) -> Optional[TaskList]:
-        # Search owned lists
+        # 1. Try DB search (Title contains name)
+        # e.g. List="Shopping List", name="Shopping"
         owned = (
             TaskList.select()
-            .where((TaskList.owner == user_id) & (TaskList.title.contains(name)))
+            .where((TaskList.owner == user_id) & (fn.Lower(TaskList.title).contains(name.lower())))
             .first()
         )
         if owned:
             return owned
 
-        # Search shared lists
+        # 2. Search shared lists
         shared = (
             TaskList.select()
             .join(SharedAccess)
             .where(
                 (SharedAccess.user == user_id)
                 & (SharedAccess.status == "ACCEPTED")
-                & (TaskList.title.contains(name))
+                & (fn.Lower(TaskList.title).contains(name.lower()))
             )
             .first()
         )
-        return shared
+        if shared:
+            return shared
+
+        # 3. Reverse search: check if any list title is contained in the search term
+        all_lists = TaskManager.get_lists(user_id)
+        name_norm = name.lower()
+        # Helper to clean up query
+        def clean(s):
+            stopwords = ["lista", "list", "de", "la", "el", "the", "una", "un", "los", "las"]
+            s = s.lower()
+            for w in stopwords:
+                s = s.replace(w, "")
+            return s.strip()
+
+        clean_name = clean(name)
+
+        for task_list in all_lists:
+            title_norm = task_list.title.lower()
+
+            # Case A: Exact match of cleaned name
+            if clean_name == title_norm:
+                return task_list
+
+            # Case B: List title is a word inside the query
+            # e.g. List="Compra", Query="lista de la compra"
+            if title_norm in name_norm:
+                return task_list
+
+            # Case C: Query is inside List title (already covered by DB contains usually, but case insensitive here)
+            if clean_name in title_norm:
+                return task_list
+
+        # 4. Fallback: return first owned list if any
+        fallback = TaskList.select().where(TaskList.owner == user_id).first()
+        if fallback:
+            return fallback
+        return None
+        return None
+
+    @staticmethod
+    def get_lists(user_id: int) -> List[TaskList]:
+        # Owned lists
+        owned = list(TaskList.select().where(TaskList.owner == user_id))
+
+        # Shared lists
+        shared = list(
+            TaskList.select()
+            .join(SharedAccess)
+            .where((SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED"))
+        )
+        return owned + shared
+
+    @staticmethod
+    def get_tasks_in_list(list_id: int) -> List[Task]:
+        return list(Task.select().where(Task.task_list == list_id).order_by(Task.status, Task.created_at))

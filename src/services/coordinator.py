@@ -87,6 +87,24 @@ class Coordinator:
             return "\n".join(results)
 
         if extraction.intent == UserIntent.QUERY_TASKS:
+            # Check if user asked for a specific list
+            if extraction.formatted_task and extraction.formatted_task.list_name:
+                list_name = extraction.formatted_task.list_name
+                found_list = self.task_manager.find_list_by_name(user_id, list_name)
+
+                if not found_list:
+                    return f"❌ No encontré ninguna lista llamada '{list_name}'."
+
+                tasks = self.task_manager.get_tasks_in_list(found_list.id)
+                if not tasks:
+                    return f"📝 La lista *{found_list.title}* está vacía."
+
+                response = [f"📝 *{found_list.title}*:"]
+                for t in tasks:
+                    status = "✅" if t.status == TaskStatus.COMPLETED else "⬜"
+                    response.append(f"{status} {t.title}")
+                return "\n".join(response)
+
             time_filter = extraction.time_filter or TimeFilter.ALL
             return self.get_task_summary(
                 user_id, time_filter, extraction.priority_filter
@@ -106,6 +124,10 @@ class Coordinator:
                 if new_task.deadline
                 else ""
             )
+
+            if new_task.task_list:
+                return f"✅ Añadido a *{new_task.task_list.title}*: {new_task.title}"
+
             return f"✅ Tarea guardada: *{new_task.title}*{deadline_str}"
 
         # Handle Task Modification Intents
@@ -255,4 +277,25 @@ class Coordinator:
         for task in tasks:
             summary += format_task_es(task)
 
+        return summary
+
+    def get_lists_summary(self, user_id: int) -> str:
+        """Returns a formatted list of lists."""
+        lists = self.task_manager.get_lists(user_id)
+        if not lists:
+            return "No tienes listas creadas ni compartidas."
+
+        summary = "*Tus Listas:*\n\n"
+        for i, task_list in enumerate(lists, 1):
+            # Owner check
+            is_owner = task_list.owner.telegram_id == user_id
+            role = "👑 Propietario" if is_owner else "👥 Compartida"
+
+            # Item count
+            count = task_list.tasks.count()
+
+            summary += f"{i}. *{task_list.title}* ({count} tareas) | {role}\n"
+            # Show members? Maybe too verbose.
+
+        summary += "\nUsa `/tasks <nombre lista>` (próximamente) o menciona la lista para añadir tareas."
         return summary

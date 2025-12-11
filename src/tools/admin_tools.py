@@ -119,7 +119,7 @@ if __name__ == "__main__":
         new_status = UserStatus.WHITELISTED
     elif action == "blacklist":
         new_status = UserStatus.BLACKLISTED
-    elif action == "kick":
+    elif action == "kick" or action == "suprimir":
         if target_input.lower() == "all":
             print("Cannot kick ALL users via this command for safety.")
             sys.exit(1)

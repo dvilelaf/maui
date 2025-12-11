@@ -96,10 +96,19 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_markdown(response)
 
 
-async def list_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for /tasks (and alias /list) command."""
     user = update.effective_user
-    summary = coordinator.get_task_summary(user.id)
-    await update.message.reply_markdown(summary)
+    # Default to all tasks for now
+    response = coordinator.get_task_summary(user.id)
+    await update.message.reply_text(response, parse_mode="Markdown")
+
+
+async def get_lists_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for /lists command."""
+    user = update.effective_user
+    response = coordinator.get_lists_summary(user.id)
+    await update.message.reply_text(response, parse_mode="Markdown")
 
 
 async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

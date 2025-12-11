@@ -98,6 +98,10 @@ class GeminiService:
             - If user says "I bought bread" or "Mark buying bread as done", the target is "buying bread" or "bread".
             - If "cancel everything", set to "ALL".
         - 'formatted_task':
+            - 'title': The task title.
+            - 'list_name': The EXACT name of the list if specified. DO NOT TRANSLATE.
+              - Example: "Add bread to lista de la compra" -> list_name="lista de la compra" (NOT "Shopping List")
+              - If no list specified, returning null/None is fine.
           - For ADD_TASK: Full details. "title": The content of the task. "deadline": if date w/o time, set to 23:59:59.
             "list_name": If user specifies a list (e.g. "add to Shopping List").
           - For EDIT_TASK: Changed fields only.
