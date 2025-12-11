@@ -9,13 +9,9 @@ import logging
 class GeminiService:
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        # Use first model as default
-        default_model = getattr(Config, "GEMINI_MODELS", ["gemini-2.5-flash"])[0]
-        self.model = genai.GenerativeModel(
-            model_name=default_model,
-            generation_config={"response_mime_type": "application/json"}
-        )
         self.logger = logging.getLogger(__name__)
+        # Track when a model can be used again: model_name -> timestamp (epoch)
+        self.model_cooldowns = {}
 
     def _get_system_prompt(self) -> str:
         return """
@@ -35,8 +31,9 @@ class GeminiService:
         - 'is_relevant': True for all except UNKNOWN.
         - 'target_search_term': For CANCEL/COMPLETE/EDIT, providing the KEYWORDS to find the task (e.g., "milk", "calling mom", "meeting").
         - 'formatted_task':
-          - For ADD_TASK: A JSON OBJECT containing full details (e.g., {{"title": "Buy milk", "deadline": null}}). NEVER a string.
-          - For EDIT_TASK: A JSON OBJECT containing only the changed fields (e.g., {{"deadline": "2025-12-12"}}). NEVER a string.
+          - For ADD_TASK: A JSON OBJECT containing full details. NEVER a string.
+            - "deadline": If user specifies a date BUT NO TIME (e.g. "today", "tomorrow", "next friday"), set time to 23:59:59. Example: "2025-10-10T23:59:59".
+          - For EDIT_TASK: A JSON OBJECT containing only the changed fields. NEVER a string.
 
         If UNKNOWN, provide reasoning in Spanish.
 
@@ -56,9 +53,17 @@ class GeminiService:
 
         max_retries = 3
         # Use models from config, defaulting to single model if list missing
-        models_to_try = getattr(Config, "GEMINI_MODELS", ["gemini-2.5-flash"])
+        models_to_try = getattr(Config, "GEMINI_MODELS", ["gemini-1.5-flash"])
+
+        last_error = None
 
         for model_name in models_to_try:
+            # CHECK COOLDOWN
+            cooldown_expiry = self.model_cooldowns.get(model_name, 0)
+            if time.time() < cooldown_expiry:
+                self.logger.info(f"Skipping model {model_name} due to cooldown (expires in {int(cooldown_expiry - time.time())}s)")
+                continue
+
             # Re-configure model for this attempt
             self.model = genai.GenerativeModel(
                 model_name=model_name,
@@ -86,29 +91,33 @@ class GeminiService:
 
                 except (InternalServerError, ServiceUnavailable) as e:
                     self.logger.warning(f"Gemini API error (model {model_name}, attempt {attempt+1}/{max_retries}): {e}")
+                    last_error = e
                     if attempt == max_retries - 1:
-                        # If this was the last retry for this model, break internal loop to try next model?
-                        # No, InternalServerError might be transient for this model/region.
-                        # But if we exhaust retries here, we could try next model.
-                        # Let's break to outer loop to try next model if available.
+                        # Try next model
                         break
                     time.sleep(1 * (attempt+1)) # Exponential-ish backoff
 
                 except ResourceExhausted as e:
                     self.logger.warning(f"Gemini Quota Exceeded for {model_name}: {e}")
+                    # SET COOLDOWN (default 60s if not parseable, but simplistic logic is fine)
+                    self.model_cooldowns[model_name] = time.time() + 60
+                    last_error = e
                     # Break inner loop immediately to rotate to next model
                     break
 
                 except Exception as e:
                     self.logger.error(f"Error processing input with Gemini ({model_name}): {e}")
-                    # For generic errors, maybe safer to abort or try next?
-                    # Let's try next model just in case.
+                    last_error = e
                     break
 
-        # If we exhausted all models and retries
+        # If we exhausted all models
+        reasoning = "Lo siento, he tenido problemas con todos mis modelos de lenguaje."
+        if isinstance(last_error, ResourceExhausted):
+            reasoning = "He alcanzado el límite de uso en todos los modelos disponibles. Inténtalo más tarde."
+
         from src.utils.schema import UserIntent
         return TaskExtractionResponse(
             is_relevant=False,
             intent=UserIntent.UNKNOWN,
-            reasoning="Lo siento, he tenido problemas con todos mis modelos de lenguaje. Por favor inténtalo más tarde."
+            reasoning=reasoning
         )
