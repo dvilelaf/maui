@@ -64,9 +64,11 @@ def kick_user(user_id: int):
         # Delete tasks first (handled by cascade usually, but explicit is safe if no FK cascade)
         # Assuming Task has ForeignKey to User.
         from src.database.models import Task
-        count = Task.delete().where(Task.user == user.telegram_id).execute()
+        task_count = Task.delete().where(Task.user == user.telegram_id).execute()
+        # Delete User
         user.delete_instance()
-        print(f"User {user_id} ({user.username}) and {count} tasks deleted.")
+        logger.warning(f"User KICKED (Deleted): {user.telegram_id} and {task_count} tasks.")
+        print(f"✅ User {user.telegram_id} (@{user.username}) and their {task_count} tasks have been deleted.")
     except Exception as e:
         print(f"Error kicking user {user_id}: {e}")
 

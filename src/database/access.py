@@ -4,6 +4,10 @@ from src.database.models import User, Task
 from src.database.core import db
 from src.utils.schema import TaskSchema, TimeFilter, TaskStatus
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class UserManager:
     @staticmethod
     def get_or_create_user(telegram_id: int, username: str = None, first_name: str = None, last_name: str = None) -> User:
@@ -15,6 +19,9 @@ class UserManager:
                 'last_name': last_name
             }
         )
+
+        if created:
+            logger.info(f"User CREATED: ID={telegram_id} (@{username})")
 
         # Update info if changed
         updates = []
@@ -30,6 +37,8 @@ class UserManager:
 
         if updates:
             user.save()
+            if not created: # Only log update if it wasn't just created
+                logger.info(f"User UPDATED: ID={telegram_id} (@{username})")
 
         return user
 
@@ -46,6 +55,7 @@ class TaskManager:
             status=TaskStatus.PENDING,
             created_at=datetime.now()
         )
+        logger.info(f"Task CREATED: ID={new_task.id} User={user_id} Title='{new_task.title}'")
         return new_task
 
     @staticmethod

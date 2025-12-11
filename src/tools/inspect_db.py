@@ -8,6 +8,10 @@ from rich.text import Text
 import datetime
 import os
 import time
+import logging
+
+# Configure logger also here if run independently, though it inherits if imported (but this is main script often)
+logger = logging.getLogger("inspect_db")
 
 from src.database.core import db, init_db
 from src.database.models import User, Task
@@ -72,20 +76,32 @@ class EditUserModal(ModalScreen):
             user.first_name = self.query_one("#first_name", Input).value
             user.last_name = self.query_one("#last_name", Input).value
             user.save()
+            logger.info(f"User {self.user_id} manual update: username={user.username}, name={user.first_name} {user.last_name}")
             self.app.notify(f"User {self.user_id} Updated")
             self.dismiss()
 
-        elif event.button.id in ["whitelist", "blacklist"]:
+        elif event.button.id == "whitelist":
             from src.tools.admin_tools import update_status
-            status = UserStatus.WHITELISTED if event.button.id == "whitelist" else UserStatus.BLACKLISTED
+            status = UserStatus.WHITELISTED
             user.status = status
             user.save()
-            self.app.notify(f"User {self.user_id} {status}")
+            logger.info(f"User {self.user_id} manual whitelist")
+            self.app.notify(f"User {self.user_id} Whitelisted")
+            self.dismiss()
+        elif event.button.id == "blacklist":
+            from src.tools.admin_tools import update_status
+            status = UserStatus.BLACKLISTED
+            user.status = status
+            user.save()
+            logger.info(f"User {self.user_id} manual blacklist")
+            self.app.notify(f"User {self.user_id} Blacklisted")
             self.dismiss()
         elif event.button.id == "kick":
-            from src.tools.admin_tools import kick_user
-            kick_user(self.user_id)
-            self.app.notify(f"User {self.user_id} KICKED (Deleted)")
+            from src.database.models import Task
+            count = Task.delete().where(Task.user == user).execute()
+            user.delete_instance()
+            logger.warning(f"User {self.user_id} manual KICK (deleted {count} tasks)")
+            self.app.notify(f"User {self.user_id} KICKED")
             self.dismiss()
         elif event.button.id == "cancel":
             self.dismiss()
@@ -158,21 +174,25 @@ class EditTaskModal(ModalScreen):
                  task.deadline = None
 
              task.save()
+             logger.info(f"Task {self.task_id} manual update: title='{task.title}' status={task.status}")
              self.app.notify(f"Task {self.task_id} Updated")
              self.dismiss()
 
          elif event.button.id == "complete":
              task.status = TaskStatus.COMPLETED
              task.save()
+             logger.info(f"Task {self.task_id} manually marked COMPLETED")
              self.app.notify(f"Task {self.task_id} Completed")
              self.dismiss()
          elif event.button.id == "pending":
              task.status = TaskStatus.PENDING
              task.save()
+             logger.info(f"Task {self.task_id} manually marked PENDING")
              self.app.notify(f"Task {self.task_id} Pending")
              self.dismiss()
          elif event.button.id == "delete":
              task.delete_instance()
+             logger.info(f"Task {self.task_id} manually DELETED")
              self.app.notify(f"Task {self.task_id} Deleted")
              self.dismiss()
          elif event.button.id == "cancel":
