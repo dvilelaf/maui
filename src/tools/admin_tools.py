@@ -9,6 +9,8 @@ from src.utils.config import Config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 async def notify_user(user_id: int, message: str):
