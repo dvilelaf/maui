@@ -58,6 +58,7 @@ class TaskExtractionResponse(BaseModel):
     is_relevant: bool = Field(description="True if the user input describes a task interaction.")
     intent: UserIntent = Field(description="The intent of the user.")
     time_filter: Optional[TimeFilter] = Field(TimeFilter.ALL, description="For QUERY_TASKS. Defaults to ALL.")
+    priority_filter: Optional[str] = Field(None, description="For QUERY_TASKS. Filter by priority: LOW, MEDIUM, HIGH, URGENT. If not specified, return all.")
     formatted_task: Optional[TaskSchema] = Field(None, description="The extracted task details (for ADD or EDIT).")
     target_search_term: Optional[str] = Field(None, description="Key phrase to find the existing task (for EDIT/CANCEL/COMPLETE).")
     reasoning: Optional[str] = Field(None, description="If UNKNOWN or ambiguous, explain why.")
