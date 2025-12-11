@@ -47,8 +47,4 @@ def format_task_es(task) -> str:
     date_str = format_datetime_es(task.deadline)
     priority_str = PRIORITY_MAP.get(task.priority, "⚪")
 
-    title = task.title
-    if title:
-        title = title[0].upper() + title[1:]
-
-    return f"• *{title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"
+    return f"• *{task.title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"
