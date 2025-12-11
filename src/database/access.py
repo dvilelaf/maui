@@ -32,7 +32,7 @@ class TaskManager:
         return new_task
 
     @staticmethod
-    def get_pending_tasks(user_id: int, time_filter: TimeFilter = TimeFilter.ALL) -> List[Task]:
+    def get_pending_tasks(user_id: int, time_filter: TimeFilter = TimeFilter.ALL, priority_filter: str = None) -> List[Task]:
         from datetime import datetime, timedelta
 
         query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
@@ -57,7 +57,11 @@ class TaskManager:
         elif time_filter == TimeFilter.YEAR:
              # Deadline <= Now + 365 days
             end_of_year = now + timedelta(days=365)
+            end_of_year = now + timedelta(days=365)
             query &= (Task.deadline <= end_of_year)
+
+        if priority_filter:
+            query &= (Task.priority == priority_filter)
 
         tasks = list(Task.select().where(query))
 
