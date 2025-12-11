@@ -32,11 +32,29 @@ class TaskManager:
         return new_task
 
     @staticmethod
-    def get_pending_tasks(user_id: int) -> List[Task]:
-        tasks = list(Task.select().where(
-            (Task.user == user_id) &
-            (Task.status == "PENDING")
-        ))
+    def get_pending_tasks(user_id: int, time_filter: str = "ALL") -> List[Task]:
+        from datetime import datetime, timedelta
+
+        query = (Task.user == user_id) & (Task.status == "PENDING")
+
+        now = datetime.now()
+
+        if time_filter == "TODAY":
+            # Deadline <= Today 23:59:59 (and not none)
+            end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            query &= (Task.deadline <= end_of_day)
+
+        elif time_filter == "WEEK":
+            # Deadline <= Now + 7 days
+            end_of_week = now + timedelta(days=7)
+            query &= (Task.deadline <= end_of_week)
+
+        elif time_filter == "MONTH":
+             # Deadline <= Now + 30 days
+            end_of_month = now + timedelta(days=30)
+            query &= (Task.deadline <= end_of_month)
+
+        tasks = list(Task.select().where(query))
 
         # Sort logic:
         # 1. Deadline: Ascending (Earnest first). None goes to LAST (using datetime.max)
@@ -66,6 +84,28 @@ class TaskManager:
     def delete_task(task_id: int) -> bool:
         query = Task.delete().where(Task.id == task_id)
         return query.execute() > 0
+
+    @staticmethod
+    def delete_all_pending_tasks(user_id: int, time_filter: str = "ALL") -> int:
+        from datetime import datetime, timedelta
+
+        query = (Task.user == user_id) & (Task.status == "PENDING")
+
+        now = datetime.now()
+
+        if time_filter == "TODAY":
+            end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            query &= (Task.deadline <= end_of_day)
+
+        elif time_filter == "WEEK":
+            end_of_week = now + timedelta(days=7)
+            query &= (Task.deadline <= end_of_week)
+
+        elif time_filter == "MONTH":
+            end_of_month = now + timedelta(days=30)
+            query &= (Task.deadline <= end_of_month)
+
+        return Task.delete().where(query).execute()
 
     @staticmethod
     def edit_task(task_id: int, **kwargs) -> bool:

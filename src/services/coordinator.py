@@ -29,7 +29,8 @@ class Coordinator:
 
         # Handle Intents
         if extraction.intent == "QUERY_TASKS":
-            return self.get_weekly_summary(user_id)
+            time_filter = extraction.time_filter or "ALL"
+            return self.get_task_summary(user_id, time_filter)
 
         if extraction.intent == "ADD_TASK" and extraction.formatted_task:
             from src.utils.formatters import format_datetime_es
@@ -44,6 +45,23 @@ class Coordinator:
         if extraction.intent in ("CANCEL_TASK", "COMPLETE_TASK", "EDIT_TASK"):
             if not extraction.target_search_term:
                 return "Entiendo que quieres modificar una tarea, pero no sé cuál. ¿Podrías ser más específico?"
+
+            # Special handling for "ALL"
+            if extraction.target_search_term == "ALL" and extraction.intent == "CANCEL_TASK":
+                time_filter = extraction.time_filter or "ALL"
+                count = self.task_manager.delete_all_pending_tasks(user_id, time_filter=time_filter)
+
+                filter_text = {
+                    "TODAY": "para hoy",
+                    "WEEK": "para esta semana",
+                    "MONTH": "para este mes",
+                    "ALL": "pendientes"
+                }.get(time_filter, "pendientes")
+
+                if count > 0:
+                    return f"🗑️ Se han eliminado {count} tareas {filter_text}."
+                else:
+                    return f"No tienes tareas {filter_text} para eliminar."
 
             # Find the task
             candidates = self.task_manager.find_tasks_by_keyword(user_id, extraction.target_search_term)
@@ -82,11 +100,6 @@ class Coordinator:
                 # I defined `title: Optional[str]` in the previous tool call for Schema update!
                 # So `exclude_unset=True` should work if I didn't set defaults in Schema.
 
-                # Code-side, we can check basic fields.
-                # Actually, in Schema, title and priority have defaults/required.
-                # I defined `title: Optional[str]` in the previous tool call for Schema update!
-                # So `exclude_unset=True` should work if I didn't set defaults in Schema.
-
                 self.logger.info(f"Updating task {target_task.id} with: {updates}")
 
                 self.task_manager.edit_task(target_task.id, **updates)
@@ -94,14 +107,22 @@ class Coordinator:
 
         return "He entendido el mensaje pero no estoy seguro de qué hacer."
 
-    def get_weekly_summary(self, user_id: int) -> str:
-        from src.utils.formatters import format_task_es
+    def get_task_summary(self, user_id: int, time_filter: str = "ALL") -> str:
+        from src.utils.formatters import format_task_es, format_datetime_es
 
-        tasks = self.task_manager.get_pending_tasks(user_id)
+        # Map filter to readable text
+        filter_text = {
+            "TODAY": "para hoy",
+            "WEEK": "para esta semana",
+            "MONTH": "para este mes",
+            "ALL": "pendientes"
+        }.get(time_filter, "pendientes")
+
+        tasks = self.task_manager.get_pending_tasks(user_id, time_filter=time_filter)
         if not tasks:
-            return "¡No tienes tareas pendientes para esta semana! 🎉"
+            return f"¡No tienes tareas {filter_text}! 🎉"
 
-        summary = "📅 *Resumen Semanal de Tareas*:\n\n"
+        summary = f"📅 *Tus Tareas ({filter_text})*:\n\n"
         for task in tasks:
             summary += format_task_es(task)
 
