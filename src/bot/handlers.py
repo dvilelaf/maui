@@ -1,6 +1,7 @@
 from telegram import Update
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ContextTypes
 from src.services.coordinator import Coordinator
+from src.utils.schema import TaskStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -83,7 +84,7 @@ async def list_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
-        if coordinator.task_manager.update_task_status(task_id, "COMPLETED"):
+        if coordinator.task_manager.update_task_status(task_id, TaskStatus.COMPLETED):
             await update.message.reply_text(f"✅ ¡Tarea {task_id} marcada como completada!")
         else:
             await update.message.reply_text(f"❌ Tarea no encontrada o no se pudo actualizar.")

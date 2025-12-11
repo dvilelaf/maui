@@ -12,6 +12,21 @@ class UserIntent(str, Enum):
     EDIT_TASK = "EDIT_TASK"
     UNKNOWN = "UNKNOWN"
 
+class TimeFilter(str, Enum):
+    TODAY = "TODAY"
+    WEEK = "WEEK"
+    MONTH = "MONTH"
+    YEAR = "YEAR"
+    ALL = "ALL"
+
+TARGET_ALL = "ALL"
+
+class TaskStatus(str, Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
 class TaskSchema(BaseModel):
     title: Optional[str] = Field(None, description="The short summary or title of the task")
     description: Optional[str] = Field(None, description="Detailed description of the task, if any")
@@ -26,10 +41,16 @@ class TaskSchema(BaseModel):
             return 'MEDIUM'
         return v.upper()
 
+    @field_validator('title')
+    def validate_title(cls, v):
+        if v:
+            return v[0].upper() + v[1:]
+        return v
+
 class TaskExtractionResponse(BaseModel):
     is_relevant: bool = Field(description="True if the user input describes a task interaction.")
     intent: UserIntent = Field(description="The intent of the user.")
-    time_filter: Optional[str] = Field(None, description="For QUERY_TASKS: 'TODAY', 'WEEK', 'MONTH', 'YEAR', or 'ALL'. Defaults to 'ALL' if unspecified.")
+    time_filter: Optional[TimeFilter] = Field(TimeFilter.ALL, description="For QUERY_TASKS. Defaults to ALL.")
     formatted_task: Optional[TaskSchema] = Field(None, description="The extracted task details (for ADD or EDIT).")
     target_search_term: Optional[str] = Field(None, description="Key phrase to find the existing task (for EDIT/CANCEL/COMPLETE).")
     reasoning: Optional[str] = Field(None, description="If UNKNOWN or ambiguous, explain why.")

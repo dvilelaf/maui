@@ -1,6 +1,7 @@
 from peewee import Model, CharField, IntegerField, DateTimeField, ForeignKeyField, TimeField, BooleanField
 from datetime import datetime
 from src.database.core import db
+from src.utils.schema import TaskStatus
 
 class BaseModel(Model):
     class Meta:
@@ -25,7 +26,7 @@ class Task(BaseModel):
     priority = CharField(default="MEDIUM") # LOW, MEDIUM, HIGH, URGENT
     created_at = DateTimeField(default=datetime.now)
     deadline = DateTimeField(null=True)
-    status = CharField(default="PENDING") # PENDING, COMPLETED, CANCELLED
+    status = CharField(default=TaskStatus.PENDING) # PENDING, COMPLETED, CANCELLED
     reminder_sent = BooleanField(default=False)
 
 def create_tables():

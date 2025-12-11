@@ -11,6 +11,7 @@ import time
 from src.database.core import db, init_db
 from src.database.models import User, Task
 from src.utils.config import Config
+from src.utils.schema import TaskStatus
 
 # Highlight duration in seconds
 HIGHLIGHT_DURATION = 5.0
@@ -119,7 +120,7 @@ class DatabaseMonitor(App):
 
             for task in tasks:
                  prio = priority_map.get(task.priority, task.priority)
-                 status_style = "green" if task.status == "COMPLETED" else "yellow" if task.status == "PENDING" else "dim"
+                 status_style = "green" if task.status == TaskStatus.COMPLETED else "yellow" if task.status == TaskStatus.PENDING else "dim"
                  # We store raw-ish status for comparison, but render styled
                  # Actually comparison should be on content.
                  # Let's simple format now.
@@ -231,7 +232,7 @@ class DatabaseMonitor(App):
                         val = new_row[col]
                         # Special formatting for Status if tasks
                         if col == "Status" and table_name == "tasks":
-                             status_style = "green" if val == "COMPLETED" else "yellow" if val == "PENDING" else "dim"
+                             status_style = "green" if val == TaskStatus.COMPLETED else "yellow" if val == TaskStatus.PENDING else "dim"
                              val = f"[{status_style}]{val}[/{status_style}]"
 
                         rendered = self._render_cell(val, is_highlighted)

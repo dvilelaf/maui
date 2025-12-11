@@ -16,6 +16,8 @@ class Coordinator:
         """
         Main entry point for processing user messages.
         """
+        from src.utils.schema import UserIntent, TimeFilter, TaskStatus, TARGET_ALL
+
         # Ensure user exists
         self.user_manager.get_or_create_user(telegram_id=user_id, username=username)
 
@@ -28,35 +30,36 @@ class Coordinator:
             return extraction.reasoning or "No he entendido eso. ¿Podrías repetirlo?"
 
         # Handle Intents
-        if extraction.intent == "QUERY_TASKS":
-            time_filter = extraction.time_filter or "ALL"
+        if extraction.intent == UserIntent.QUERY_TASKS:
+            time_filter = extraction.time_filter or TimeFilter.ALL
             return self.get_task_summary(user_id, time_filter)
 
-        if extraction.intent == "ADD_TASK" and extraction.formatted_task:
+        if extraction.intent == UserIntent.ADD_TASK and extraction.formatted_task:
             from src.utils.formatters import format_datetime_es
 
-            task_data = extraction.formatted_task.model_dump()
-            new_task = self.task_manager.add_task(user_id, task_data)
+            # Pass the Pydantic model directly
+            # extraction.formatted_task is already a TaskSchema
+            new_task = self.task_manager.add_task(user_id, extraction.formatted_task)
 
             deadline_str = f" para {format_datetime_es(new_task.deadline)}" if new_task.deadline else ""
             return f"✅ Tarea guardada: *{new_task.title}*{deadline_str}"
 
         # Handle Task Modification Intents
-        if extraction.intent in ("CANCEL_TASK", "COMPLETE_TASK", "EDIT_TASK"):
+        if extraction.intent in (UserIntent.CANCEL_TASK, UserIntent.COMPLETE_TASK, UserIntent.EDIT_TASK):
             if not extraction.target_search_term:
                 return "Entiendo que quieres modificar una tarea, pero no sé cuál. ¿Podrías ser más específico?"
 
             # Special handling for "ALL"
-            if extraction.target_search_term == "ALL" and extraction.intent == "CANCEL_TASK":
-                time_filter = extraction.time_filter or "ALL"
+            if extraction.target_search_term == TARGET_ALL and extraction.intent == UserIntent.CANCEL_TASK:
+                time_filter = extraction.time_filter or TimeFilter.ALL
                 count = self.task_manager.delete_all_pending_tasks(user_id, time_filter=time_filter)
 
                 filter_text = {
-                    "TODAY": "para hoy",
-                    "WEEK": "para esta semana",
-                    "MONTH": "para este mes",
-                    "YEAR": "para este año",
-                    "ALL": "pendientes"
+                    TimeFilter.TODAY: "para hoy",
+                    TimeFilter.WEEK: "para esta semana",
+                    TimeFilter.MONTH: "para este mes",
+                    TimeFilter.YEAR: "para este año",
+                    TimeFilter.ALL: "pendientes"
                 }.get(time_filter, "pendientes")
 
                 if count > 0:
@@ -75,49 +78,38 @@ class Coordinator:
 
             target_task = candidates[0]
 
-            if extraction.intent == "CANCEL_TASK":
+            if extraction.intent == UserIntent.CANCEL_TASK:
                 self.task_manager.delete_task(target_task.id)
                 return f"🗑️ Tarea eliminada: *{target_task.title}*"
 
-            if extraction.intent == "COMPLETE_TASK":
-                self.task_manager.update_task_status(target_task.id, "COMPLETED")
+            if extraction.intent == UserIntent.COMPLETE_TASK:
+                self.task_manager.update_task_status(target_task.id, TaskStatus.COMPLETED)
                 return f"✅ Tarea completada: *{target_task.title}*"
 
-            if extraction.intent == "EDIT_TASK" and extraction.formatted_task:
-                # Apply updates
-                updates = extraction.formatted_task.model_dump(exclude_unset=True)
-                # Remove None values
-                updates = {k: v for k, v in updates.items() if v is not None}
+            if extraction.intent == UserIntent.EDIT_TASK and extraction.formatted_task:
+                self.logger.info(f"Updating task {target_task.id} with: {extraction.formatted_task}")
 
-                # Exclude priority if it's default value and not explicitly changed?
-                # Pydantic sends defaults. Tough one.
-                # The prompt says "Only the changed fields".
-                # Schema has defaults. We should ideally make all fields Optional in TaskSchema for edits,
-                # but TaskSchema is reused.
-                # Let's trust Gemini populated fields only if changed? No, Pydantic fills defaults.
-                # Hack: In prompt we said "Only the changed fields".
-                # Code-side, we can check basic fields.
-                # Actually, in Schema, title and priority have defaults/required.
-                # I defined `title: Optional[str]` in the previous tool call for Schema update!
-                # So `exclude_unset=True` should work if I didn't set defaults in Schema.
+                # Pass Pydantic model directly
+                success = self.task_manager.edit_task(target_task.id, extraction.formatted_task)
 
-                self.logger.info(f"Updating task {target_task.id} with: {updates}")
-
-                self.task_manager.edit_task(target_task.id, **updates)
-                return f"✏️ Tarea actualizada: *{target_task.title}*"
+                if success:
+                    return f"✏️ Tarea actualizada: *{target_task.title}*"
+                else:
+                    return "❌ No se pudo actualizar la tarea (quizás no hubo cambios)."
 
         return "He entendido el mensaje pero no estoy seguro de qué hacer."
 
     def get_task_summary(self, user_id: int, time_filter: str = "ALL") -> str:
         from src.utils.formatters import format_task_es, format_datetime_es
+        from src.utils.schema import TimeFilter
 
         # Map filter to readable text
         filter_text = {
-            "TODAY": "para hoy",
-            "WEEK": "para esta semana",
-            "MONTH": "para este mes",
-            "YEAR": "para este año",
-            "ALL": "pendientes"
+            TimeFilter.TODAY: "para hoy",
+            TimeFilter.WEEK: "para esta semana",
+            TimeFilter.MONTH: "para este mes",
+            TimeFilter.YEAR: "para este año",
+            TimeFilter.ALL: "pendientes"
         }.get(time_filter, "pendientes")
 
         tasks = self.task_manager.get_pending_tasks(user_id, time_filter=time_filter)
