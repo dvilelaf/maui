@@ -41,7 +41,7 @@ class Coordinator:
         # Handle Intents
         if extraction.intent == UserIntent.QUERY_TASKS:
             time_filter = extraction.time_filter or TimeFilter.ALL
-            return self.get_task_summary(user_id, time_filter)
+            return self.get_task_summary(user_id, time_filter, extraction.priority_filter)
 
         if extraction.intent == UserIntent.ADD_TASK and extraction.formatted_task:
             from src.utils.formatters import format_datetime_es
@@ -108,7 +108,7 @@ class Coordinator:
 
         return "He entendido el mensaje pero no estoy seguro de qué hacer."
 
-    def get_task_summary(self, user_id: int, time_filter: str = "ALL") -> str:
+    def get_task_summary(self, user_id: int, time_filter: str = "ALL", priority_filter: str = None) -> str:
         from src.utils.formatters import format_task_es, format_datetime_es
         from src.utils.schema import TimeFilter
 
@@ -121,7 +121,10 @@ class Coordinator:
             TimeFilter.ALL: "pendientes"
         }.get(time_filter, "pendientes")
 
-        tasks = self.task_manager.get_pending_tasks(user_id, time_filter=time_filter)
+        if priority_filter:
+            filter_text += f" - Prioridad {priority_filter}"
+
+        tasks = self.task_manager.get_pending_tasks(user_id, time_filter=time_filter, priority_filter=priority_filter)
         if not tasks:
             return f"¡No tienes tareas {filter_text}! 🎉"
 
