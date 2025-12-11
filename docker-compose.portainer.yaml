@@ -1,6 +1,5 @@
 services:
   maui:
-    build: .
     image: dvilela/maui
     container_name: maui
     restart: unless-stopped

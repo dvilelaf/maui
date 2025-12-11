@@ -97,6 +97,12 @@ def update_all_pending(status: UserStatus):
 
 if __name__ == "__main__":
     init_db()
+    # Ensure tables exist (crucial for first run or separate script execution)
+    from src.database.models import User, Task
+    from src.database.core import db
+
+    db.connect()
+    db.create_tables([User, Task], safe=True)
     if len(sys.argv) < 3:
         print(
             "Usage: python admin_tools.py <whitelist|blacklist> <user_id|@username|all>"
