@@ -20,6 +20,11 @@ class GeminiService:
         self.model_cooldowns = {}
         # Track key cooldowns if needed, or just simple rotation
 
+        # Optimize keys verified status
+        self._verify_and_sort_keys()
+
+        self._configure_client()
+
     def _configure_client(self):
         genai.configure(api_key=self.api_keys[self.current_key_index])
 
@@ -27,6 +32,38 @@ class GeminiService:
         self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
         self._configure_client()
         self.logger.info(f"Switched to API Key index {self.current_key_index}")
+
+    def _verify_and_sort_keys(self):
+        """Checks usage limits of keys and pushes exhausted ones to the back."""
+        working_keys = []
+        exhausted_keys = []
+
+        self.logger.info(f"Verifying {len(self.api_keys)} API keys...")
+
+        for key in self.api_keys:
+            try:
+                genai.configure(api_key=key)
+                model = genai.GenerativeModel("gemini-2.5-flash") # Use a common model for verification
+                # Lightweight check
+                model.generate_content("ping")
+                working_keys.append(key)
+            except Exception as e:
+                self.logger.warning(f"Key verification failed for a key (moving to end): {e}")
+                exhausted_keys.append(key)
+
+        if not working_keys and not exhausted_keys:
+             self.logger.error("No API keys provided!")
+             raise ValueError("No API keys provided or all are invalid.")
+        elif not working_keys:
+             self.logger.error("All API keys seem to be exhausted or invalid!")
+             self.api_keys = exhausted_keys # Keep all just in case, but will likely fail
+        else:
+             self.logger.info(f"Key optimization complete: {len(working_keys)} working, {len(exhausted_keys)} exhausted.")
+             self.api_keys = working_keys + exhausted_keys
+
+        # Reset current_key_index to 0 after sorting
+        self.current_key_index = 0
+        self.logger.info(f"Initial API Key index set to {self.current_key_index}")
 
     def _get_system_prompt(self) -> str:
         return """
