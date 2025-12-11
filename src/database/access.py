@@ -63,3 +63,11 @@ class TaskManager:
             return False
 
         return Task.update(**updates).where(Task.id == task_id).execute() > 0
+
+    @staticmethod
+    def find_tasks_by_keyword(user_id: int, keyword: str) -> List[Task]:
+        return list(Task.select().where(
+            (Task.user == user_id) &
+            (Task.status == "PENDING") &
+            ((Task.title.contains(keyword)) | (Task.description.contains(keyword)))
+        ))
