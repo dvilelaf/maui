@@ -3,12 +3,15 @@ version: '3.8'
 services:
   maui-bot:
     build: .
-    container_name: maui_bot
+    image: dvilela/maui
+    container_name: maui
     restart: unless-stopped
     volumes:
       - ./src:/app/src # For development (hot reload not native but useful for inspection)
       - ./maui.db:/app/maui.db # Persist database
-    env_file:
-      - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+      - DATABASE_URL=${DATABASE_URL}
+      - LOG_LEVEL=${LOG_LEVEL}
