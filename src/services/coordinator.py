@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class Coordinator:
     def __init__(self):
-        self.gemini = GeminiService(api_key=Config.GEMINI_API_KEY)
+        self.gemini = GeminiService(api_keys=Config.GEMINI_API_KEYS)
         self.task_manager = TaskManager()
         self.user_manager = UserManager()
         self.logger = logger

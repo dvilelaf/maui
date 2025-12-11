@@ -7,11 +7,26 @@ from typing import Optional, Union
 import logging
 
 class GeminiService:
-    def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
+    def __init__(self, api_keys: list[str]):
+        self.api_keys = api_keys
+        if not self.api_keys:
+             raise ValueError("No Gemini API keys provided.")
+
+        self.current_key_index = 0
+        self._configure_client()
+
         self.logger = logging.getLogger(__name__)
         # Track when a model can be used again: model_name -> timestamp (epoch)
         self.model_cooldowns = {}
+        # Track key cooldowns if needed, or just simple rotation
+
+    def _configure_client(self):
+        genai.configure(api_key=self.api_keys[self.current_key_index])
+
+    def _rotate_key(self):
+        self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+        self._configure_client()
+        self.logger.info(f"Switched to API Key index {self.current_key_index}")
 
     def _get_system_prompt(self) -> str:
         return """
@@ -122,11 +137,39 @@ class GeminiService:
                     time.sleep(1 * (attempt+1)) # Exponential-ish backoff
 
                 except ResourceExhausted as e:
-                    self.logger.warning(f"Gemini Quota Exceeded for {model_name}: {e}")
-                    # SET COOLDOWN (default 60s if not parseable, but simplistic logic is fine)
+                    self.logger.warning(f"Gemini Quota Exceeded (KeyIdx: {self.current_key_index}, Model: {model_name}): {e}")
+
+                    # Try rotating keys first
+                    # We try all keys for the CURRENT model before giving up on the model
+                    keys_tried = 0
+                    success_with_other_key = False
+
+                    while keys_tried < len(self.api_keys) - 1: # Try other keys
+                        self._rotate_key()
+                        keys_tried += 1
+                        try:
+                            # Re-create model with new key config
+                            self.model = genai.GenerativeModel(
+                                model_name=model_name,
+                                generation_config={"response_mime_type": "application/json"}
+                            )
+                            # Retry request immediately
+                            response = self.model.generate_content(prompt_parts)
+                            self.logger.info(f"Gemini Raw Response (Recovered with Key {self.current_key_index}): {response.text}")
+                            return TaskExtractionResponse.model_validate_json(response.text)
+                        except ResourceExhausted:
+                            self.logger.warning(f"Key {self.current_key_index} also exhausted.")
+                            continue
+                        except Exception as inner_e:
+                             self.logger.error(f"Error with rotated key {self.current_key_index}: {inner_e}")
+                             # If other error, break key rotation loop and fallback to next model logic?
+                             # For now, treat as exhaustion/failure and continue rotating
+                             continue
+
+                    # If we fall through here, ALL keys failed for this model.
+                    # Set cooldown for this model and break to next model.
                     self.model_cooldowns[model_name] = time.time() + 60
                     last_error = e
-                    # Break inner loop immediately to rotate to next model
                     break
 
                 except Exception as e:

@@ -5,7 +5,8 @@ load_dotenv()
 
 class Config:
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    _keys = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_API_KEYS = [k.strip() for k in _keys.split(",") if k.strip()]
     GEMINI_MODELS = [
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
