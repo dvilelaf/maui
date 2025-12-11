@@ -81,7 +81,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_file = await context.bot.get_file(voice.file_id)
     file_bytes = await new_file.download_as_bytearray()
 
-    response = coordinator.handle_message(
+    response = await coordinator.handle_message(
         user_id=user.id,
         username=user.username,
         content=bytes(file_bytes),
