@@ -33,6 +33,11 @@ class UserStatus(str, Enum):
     BLACKLISTED = "BLACKLISTED"
 
 
+class FormattedTask(BaseModel):
+    title: str = Field(description="The content of the task")
+    deadline: Optional[str] = Field(description="ISO format deadline if mentioned")
+
+
 class TaskSchema(BaseModel):
 
     title: Optional[str] = Field(None, description="The short summary or title of the task")
