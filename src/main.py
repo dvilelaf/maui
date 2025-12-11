@@ -1,5 +1,4 @@
 import logging
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from src.utils.config import Config
 from src.database.core import init_db
 from src.database.models import create_tables
@@ -11,7 +10,10 @@ from src.bot.handlers import (
     list_tasks_command,
     complete_task_command,
     cancel_task_command,
+    add_task_command,
 )
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram import BotCommand
 
 # Enable logging
 logging.basicConfig(
@@ -21,6 +23,19 @@ logging.basicConfig(
 # Silence httpx logger
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+async def post_init(application: Application):
+    """Set bot commands on startup."""
+    commands = [
+        BotCommand("start", "Iniciar el bot"),
+        BotCommand("help", "Ayuda y ejemplos"),
+        BotCommand("add", "Añadir tarea"),
+        BotCommand("list", "Ver tareas pendientes"),
+        BotCommand("done", "Marcar como completada"),
+        BotCommand("delete", "Borrar tarea"),
+    ]
+    await application.bot.set_my_commands(commands)
 
 
 def main():
@@ -34,14 +49,19 @@ def main():
         print("Error: TELEGRAM_TOKEN not found in environment variables.")
         return
 
-    application = Application.builder().token(Config.TELEGRAM_TOKEN).build()
+    application = (
+        Application.builder().token(Config.TELEGRAM_TOKEN).post_init(post_init).build()
+    )
 
     # 3. Register Handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("tasks", list_tasks_command))
+    application.add_handler(CommandHandler("list", list_tasks_command))  # Alias
     application.add_handler(CommandHandler("done", complete_task_command))
     application.add_handler(CommandHandler("cancel", cancel_task_command))
+    application.add_handler(CommandHandler("delete", cancel_task_command))  # Alias
+    application.add_handler(CommandHandler("add", add_task_command))
 
     # Text messages
     application.add_handler(

@@ -127,3 +127,26 @@ async def cancel_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("❌ Tarea no encontrada.")
     except (IndexError, ValueError):
         await update.message.reply_text("Uso: /cancel <id_tarea>")
+
+
+async def add_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /add command to create a task directly."""
+    user = update.effective_user
+    text = " ".join(context.args)
+
+    if not text:
+        await update.message.reply_text("Uso: /add <descripción de la tarea>")
+        return
+
+    await update.message.reply_chat_action(action="typing")
+
+    response = await coordinator.handle_message(
+        user_id=user.id,
+        username=user.username,
+        content=text,
+        is_voice=False,
+        first_name=user.first_name,
+        last_name=user.last_name,
+    )
+
+    await update.message.reply_markdown(response)
