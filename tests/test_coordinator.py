@@ -1,7 +1,7 @@
 
 import pytest
 import pytest_asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from src.services.coordinator import Coordinator
 from src.utils.schema import TaskSchema, TaskStatus, TimeFilter, UserIntent, TaskExtractionResponse, UserStatus
 from src.database.models import User, Task
@@ -10,9 +10,13 @@ from datetime import datetime, timedelta
 
 @pytest.fixture
 def coordinator(mock_gemini, test_db, mock_bot):
-    coord = Coordinator()
-    coord.gemini.model = mock_gemini
-    return coord
+    with patch("src.services.llm_provider.LLMFactory.get_provider") as mock_factory:
+        mock_provider = MagicMock()
+        mock_factory.return_value = mock_provider
+        coord = Coordinator()
+        # Ensure we can mock process_input
+        coord.llm = mock_provider
+        return coord
 
 @pytest.fixture
 def user(test_db):
@@ -325,7 +329,7 @@ async def test_cancel_all_filter(coordinator, mocker):
 async def test_handle_no_extraction(coordinator, mocker):
     mocker.patch.object(coordinator.user_manager, "get_or_create_user", return_value=MagicMock(status=UserStatus.WHITELISTED))
     # Mock gemini
-    mocker.patch.object(coordinator.gemini, "process_input", return_value=TaskExtractionResponse(intent=UserIntent.UNKNOWN, is_relevant=False))
+    mocker.patch.object(coordinator.llm, "process_input", return_value=TaskExtractionResponse(intent=UserIntent.UNKNOWN, is_relevant=False))
     resp = await coordinator.handle_message(123, "u", "raw", extraction=None)
     assert "No he entendido" in resp
 

@@ -14,3 +14,9 @@ class Config:
     ]
     DATABASE_URL = os.getenv("DATABASE_URL", "maui.db")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+    # LLM Configuration
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    GROQ_WHISPER_MODEL = "whisper-large-v3"

@@ -1,11 +1,13 @@
 import google.generativeai as genai
 from src.utils.schema import TaskExtractionResponse
 from src.utils.config import Config
+from src.services.llm_provider import LLMProvider
+from src.utils.config import Config
 from typing import Union
 import logging
 
 
-class GeminiService:
+class GeminiService(LLMProvider):
     def __init__(self, api_keys: list[str]):
         self.api_keys = api_keys
         if not self.api_keys:

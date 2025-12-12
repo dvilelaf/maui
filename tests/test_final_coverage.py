@@ -100,7 +100,7 @@ async def test_coordinator_unhandled_intent(mocker, test_db):
     )
 
     coord = Coordinator()
-    coord.gemini = mock_gemini
+    coord.llm = mock_gemini
 
     # Ensure user is APPROVED
     user, _ = User.get_or_create(telegram_id=1, defaults={"first_name": "Test", "status": "APPROVED"})

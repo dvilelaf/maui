@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from src.services.gemini import GeminiService
+from src.services.llm_provider import LLMFactory
 from src.database.access import TaskManager, UserManager
 from src.utils.config import Config
 import logging
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class Coordinator:
     def __init__(self):
-        self.gemini = GeminiService(api_keys=Config.GEMINI_API_KEYS)
+        self.llm = LLMFactory.get_provider()
         self.task_manager = TaskManager()
         self.user_manager = UserManager()
         self.logger = logger
@@ -60,7 +60,7 @@ class Coordinator:
 
         # 1. Extract intent/task via Gemini
         if not extraction:
-            extraction = self.gemini.process_input(content, mime_type=mime_type)
+            extraction = self.llm.process_input(content, mime_type=mime_type)
 
         if not extraction.is_relevant:
             return extraction.reasoning or "No he entendido eso. ¿Podrías repetirlo?"
