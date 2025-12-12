@@ -43,8 +43,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_html(
         f"¡Hola {user.mention_html()}! Soy Maui, tu asistente de tareas inteligente. 🌴\n"
-        f"Simplemente envíame un mensaje (texto o voz) describiendo lo que necesitas hacer, "
-        f"y yo lo organizaré por ti.",
+        f"Para gestionar tus tareas y listas, por favor utiliza la <b>Mini App</b> pulsando el botón de abajo.\n\n"
+        f"También puedes enviarme mensajes de voz o texto y yo los procesaré.",
         reply_markup=reply_markup
     )
 
@@ -61,15 +61,12 @@ async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a help message when the command /help is issued."""
     await update.message.reply_text(
-        "¡Puedo ayudarte a gestionar tus tareas!\n\n"
-        "Envía un mensaje como:\n"
-        "- 'Comprar leche mañana a las 5pm'\n"
-        "- 'Llamar a mamá el domingo'\n\n"
-        "Comandos:\n"
-        "/tasks - Ver tareas pendientes\n"
-        "/done <id> - Marcar tarea como completada\n"
-        "/cancel <id> - Cancelar una tarea\n"
-        "/help - Mostrar este mensaje"
+        "¡Hola! Para usar Maui, por favor utiliza la Mini App.\n\n"
+        "Comandos disponibles:\n"
+        "/start - Iniciar el bot y mostrar la botonera\n"
+        "/app - Botón directo a la Mini App\n"
+        "/help - Mostrar este mensaje\n\n"
+        "¡Recuerda que también puedes enviarme notas de voz! 🎙️"
     )
 
 
@@ -123,68 +120,3 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Lo siento, hubo un error al procesar tu audio. Por favor intenta de nuevo."
         )
-
-
-async def get_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler for /tasks (and alias /list) command."""
-    user = update.effective_user
-    # Default to all tasks for now
-    response = get_coordinator().get_task_summary(user.id)
-    await update.message.reply_text(response, parse_mode="Markdown")
-
-
-async def get_lists_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler for /lists command."""
-    user = update.effective_user
-    response = get_coordinator().get_lists_summary(user.id)
-    await update.message.reply_text(response, parse_mode="Markdown")
-
-
-async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        task_id = int(context.args[0])
-        if get_coordinator().task_manager.update_task_status(task_id, TaskStatus.COMPLETED):
-            await update.message.reply_text(
-                f"✅ ¡Tarea {task_id} marcada como completada!"
-            )
-        else:
-            await update.message.reply_text(
-                f"❌ Tarea {task_id} no encontrada o no se pudo actualizar."
-            )
-    except (IndexError, ValueError):
-        await update.message.reply_text("Uso: /done <id_tarea>")
-
-
-async def cancel_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        task_id = int(context.args[0])
-        success = get_coordinator().task_manager.update_task_status(task_id, "CANCELLED")
-        if success:
-            await update.message.reply_text(f"🗑️ Tarea {task_id} cancelada.")
-        else:
-            await update.message.reply_text("❌ Tarea no encontrada.")
-    except (IndexError, ValueError):
-        await update.message.reply_text("Uso: /cancel <id_tarea>")
-
-
-async def add_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle the /add command to create a task directly."""
-    user = update.effective_user
-    text = " ".join(context.args)
-
-    if not text:
-        await update.message.reply_text("Uso: /add <descripción de la tarea>")
-        return
-
-    await update.message.reply_chat_action(action="typing")
-
-    response = await get_coordinator().handle_message(
-        user_id=user.id,
-        username=user.username,
-        content=text,
-        is_voice=False,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
-
-    await update.message.reply_markdown(response)
