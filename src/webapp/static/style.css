@@ -1,0 +1,334 @@
+:root {
+    --tg-theme-bg-color: #ffffff;
+    --tg-theme-text-color: #000000;
+    --tg-theme-hint-color: #999999;
+    --tg-theme-link-color: #2481cc;
+    --tg-theme-button-color: #2481cc;
+    --tg-theme-button-text-color: #ffffff;
+    --tg-theme-secondary-bg-color: #f0f0f0;
+
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --border-radius: 12px;
+}
+
+body {
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+}
+
+header {
+    padding: var(--spacing-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+#user-info {
+    font-size: 14px;
+    color: var(--tg-theme-hint-color);
+}
+
+.tabs {
+    display: flex;
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--tg-theme-hint-color);
+    cursor: pointer;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+    background-color: var(--tg-theme-secondary-bg-color);
+    color: var(--tg-theme-text-color);
+}
+
+.view {
+    display: none;
+    padding: 0 var(--spacing-md);
+    padding-bottom: 80px;
+    /* Space for main button */
+}
+
+.view.active {
+    display: block;
+}
+
+.input-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+#new-task-input {
+    flex: 1;
+    padding: 12px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--tg-theme-hint-color);
+    /* Fallback */
+    border: 1px solid var(--tg-theme-secondary-bg-color);
+    background-color: var(--tg-theme-secondary-bg-color);
+    color: var(--tg-theme-text-color);
+    font-size: 16px;
+    outline: none;
+}
+
+#new-task-input:focus {
+    border-color: var(--tg-theme-link-color);
+}
+
+#add-task-btn {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    border: none;
+    border-radius: var(--border-radius);
+    width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.action-btn {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+input,
+textarea {
+    user-select: auto !important;
+    -webkit-user-select: auto !important;
+}
+
+.list-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.task-item,
+.list-item {
+    background-color: var(--tg-theme-secondary-bg-color);
+    padding: 12px;
+    border-radius: var(--border-radius);
+    display: flex;
+    /* align-items: center; removed default center for column layout support in list-item override */
+    justify-content: space-between;
+    transition: transform 0.1s active;
+}
+
+.task-item {
+    align-items: center;
+}
+
+.list-item {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.task-item:active {
+    transform: scale(0.98);
+}
+
+.task-item.completed {
+    opacity: 0.6;
+}
+
+.task-item.completed .task-content {
+    text-decoration: line-through;
+    color: var(--tg-theme-hint-color);
+}
+
+
+.task-content {
+    flex: 1;
+    margin-left: 12px;
+}
+
+.task-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--tg-theme-hint-color);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.task-checkbox.checked {
+    background-color: var(--tg-theme-button-color);
+    border-color: var(--tg-theme-button-color);
+}
+
+.task-checkbox.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 12px;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    color: #ff3b30;
+    opacity: 0;
+    transition: opacity 0.2s;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.task-item:hover .delete-btn {
+    opacity: 1;
+}
+
+/* Ensure visible on touch if no hover */
+@media (hover: none) {
+    .delete-btn {
+        opacity: 0.5;
+    }
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--tg-theme-hint-color);
+    margin-top: 40px;
+}
+
+.list-header {
+    margin-bottom: 8px;
+    font-size: 16px;
+    color: var(--tg-theme-text-color);
+}
+
+.list-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 8px;
+    border-left: 2px solid var(--tg-theme-secondary-bg-color);
+}
+
+.task-item.small {
+    padding: 8px;
+    font-size: 14px;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.icon-btn:hover {
+    opacity: 1;
+}
+
+.invite-item {
+    background: var(--tg-theme-secondary-bg-color);
+    padding: 12px;
+    border-radius: var(--border-radius);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.invite-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.task-deadline {
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.deadline-expired {
+    color: #ff3b30;
+    font-weight: 500;
+}
+
+.deadline-today {
+    color: #ff9500;
+    font-weight: 500;
+}
+
+.deadline-soon {
+    color: var(--tg-theme-link-color);
+}
+
+.deadline-future,
+.deadline-week {
+    color: var(--tg-theme-hint-color);
+}
+
+.list-add-task {
+    display: flex;
+    gap: 8px;
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid var(--tg-theme-secondary-bg-color);
+}
+
+.list-add-task input {
+    flex: 1;
+    min-width: 0;
+    /* Prevents overflow in flex container */
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--tg-theme-hint-color);
+    font-size: 14px;
+}
+
+.list-add-task button {
+    background-color: var(--tg-theme-button-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 32px;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.edit-btn {
+    font-size: 14px;
+    margin-right: 4px;
+    opacity: 0.5;
+}
+
+.edit-btn:hover {
+    opacity: 1;
+}

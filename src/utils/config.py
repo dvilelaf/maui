@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = Field(default="llama-3.3-70b-versatile")
     GROQ_WHISPER_MODEL: str = Field(default="whisper-large-v3")
 
+    # Web App Configuration
+    WEBAPP_URL: str = Field(default="https://localhost:8000")
+
     @computed_field
     @property
     def GEMINI_API_KEYS(self) -> List[str]:

@@ -14,3 +14,25 @@ services:
       - GEMINI_API_KEYS=${GEMINI_API_KEYS}
       - DATABASE_URL=${DATABASE_URL}
       - LOG_LEVEL=${LOG_LEVEL}
+
+  webapp:
+    build: .
+    image: dvilela/maui
+    container_name: maui-webapp
+    restart: unless-stopped
+    command: uv run uvicorn src.webapp.app:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./src:/app/src
+      - ./maui.db:/app/maui.db
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+      - DATABASE_URL=${DATABASE_URL}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - WEBAPP_URL=${WEBAPP_URL}
+    depends_on:
+      - maui

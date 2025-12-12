@@ -234,6 +234,41 @@ class TaskManager:
         return tasks
 
     @staticmethod
+    def get_user_tasks(
+        user_id: int,
+        sort_by: str = "deadline"
+    ) -> List[Task]:
+        """Get all tasks (pending and completed) for a user, excluding tasks in lists."""
+        from datetime import datetime
+
+        # Base query: user's tasks, not in a list, and NOT CANCELLED
+        query = (Task.user == user_id) & (Task.task_list.is_null()) & (Task.status != "CANCELLED")
+
+        # Fetch all
+        tasks = list(Task.select().where(query))
+
+        # Sort logic:
+        # PENDING first, then COMPLETED.
+        # Within that: Deadline (earliest first) -> Priority -> Created At
+
+        priority_order = {"URGENT": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+
+        def sort_key(t):
+            # Status: Pending (0) < Completed (1)
+            status_val = 0 if t.status == TaskStatus.PENDING else 1
+
+            # Deadline: None is "far future" for Pending, but maybe irrelevant for completed?
+            # Let's keep consistent.
+            deadline_val = t.deadline if t.deadline else datetime.max
+
+            priority_val = priority_order.get(t.priority, 99)
+
+            return (status_val, deadline_val, priority_val)
+
+        tasks.sort(key=sort_key)
+        return tasks
+
+    @staticmethod
     def get_task_by_id(task_id: int) -> Optional[Task]:
         return Task.get_or_none(Task.id == task_id)
 
@@ -582,6 +617,65 @@ class TaskManager:
             .where((SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED"))
         )
         return owned + shared
+
+    @staticmethod
+    def delete_list(user_id: int, list_id: int) -> bool:
+        """
+        Delete a list owned by the user.
+        Cascades to SharedAccess but TASKS in the list might need to be handled.
+        Option: Delete tasks (default).
+        """
+        try:
+            # Check ownership
+            lst = TaskList.get_or_none(TaskList.id == list_id)
+            if not lst:
+                return False
+
+            if lst.owner.telegram_id != user_id:
+                # Not owner
+                return False
+
+            # Delete tasks first (or rely on Cascade if configured? Peewee defaults vary, safe to manual)
+            Task.delete().where(Task.task_list == list_id).execute()
+
+            # Shared Access should cascade if DB constraints set, but let's manual delete to be safe
+            SharedAccess.delete().where(SharedAccess.task_list == list_id).execute()
+
+            ls_count = lst.delete_instance()
+            return ls_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting list {list_id}: {e}")
+            return False
+
+    @staticmethod
+    def get_pending_invites(user_id: int) -> List[dict]:
+        """
+        Get pending invitations for a user.
+        Returns list of dicts with list info.
+        """
+        # Join SharedAccess with TaskList to get title, and TaskList owner to get owner name
+        query = (
+            SharedAccess.select(SharedAccess, TaskList, User)
+            .join(TaskList, on=(SharedAccess.task_list == TaskList.id))
+            .join(User, on=(TaskList.owner == User.telegram_id)) # Owner of list
+            .where(
+                (SharedAccess.user == user_id)
+                & (SharedAccess.status == "PENDING")
+            )
+        )
+
+        results = []
+        for access in query:
+            # access.task_list is valid because of join
+            tlist = access.task_list
+            owner = tlist.owner
+            results.append({
+                "list_id": tlist.id,
+                "list_name": tlist.title,
+                "owner_name": owner.username or owner.first_name or "Unknown",
+                "invited_at": str(access.id) # Dummy for now or check created_at if model has it
+            })
+        return results
 
     @staticmethod
     def get_tasks_in_list(list_id: int) -> List[Task]:

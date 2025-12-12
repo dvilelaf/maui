@@ -36,7 +36,7 @@ format:
 # Run locally without Docker
 run:
     uv sync
-    uv run python src/main.py
+    uv run python src/tools/run_dev.py
 
 # Run the tests
 test:
@@ -55,6 +55,11 @@ whitelist target:
 blacklist target:
     uv run python src/tools/admin_tools.py blacklist {{target}}
 
+
 # Kick a user (ID or @username)
 kick target:
     uv run python src/tools/admin_tools.py kick {{target}}
+
+# Kill dangling processes on port 8000
+kill:
+    fuser -k 8000/tcp || true

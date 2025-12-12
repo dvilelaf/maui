@@ -12,6 +12,7 @@ from src.bot.handlers import (
     complete_task_command,
     cancel_task_command,
     add_task_command,
+    webapp_command,
 )
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from telegram import BotCommand
@@ -36,6 +37,7 @@ async def post_init(application: Application):
         BotCommand("lists", "Ver listas de tareas"),
         BotCommand("done", "Marcar como completada"),
         BotCommand("delete", "Borrar tarea"),
+        BotCommand("app", "Abrir Web App"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -65,6 +67,7 @@ def main():
     application.add_handler(CommandHandler("cancel", cancel_task_command))
     application.add_handler(CommandHandler("delete", cancel_task_command))  # Alias
     application.add_handler(CommandHandler("add", add_task_command))
+    application.add_handler(CommandHandler("app", webapp_command))
 
     # Text messages
     application.add_handler(

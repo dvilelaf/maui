@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Maui Tasks</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <h1>Maui 🌴</h1>
+            <div id="user-info">Loading...</div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tasks')">Tareas</button>
+            <button class="tab-btn" onclick="switchTab('lists')">Listas</button>
+        </nav>
+
+        <main id="tasks-view" class="view active">
+            <div class="input-group">
+                <input type="text" id="new-task-input" placeholder="Añadir nueva tarea...">
+                <button id="add-task-btn" onclick="addTask()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+            <div id="tasks-container" class="list-container">
+                <!-- Tasks injected here -->
+            </div>
+        </main>
+
+        <main id="lists-view" class="view">
+            <div id="invites-container" style="display:none; margin-bottom: 20px;"></div>
+            <div class="input-group">
+                <button class="action-btn" onclick="addList()" style="width: 100%; justify-content: center;">
+                    + Nueva Lista
+                </button>
+            </div>
+            <div id="lists-container" class="list-container">
+                <!-- Lists injected here -->
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

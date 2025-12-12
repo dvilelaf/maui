@@ -1,7 +1,8 @@
-from telegram import Update
+from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 from src.services.coordinator import Coordinator
 from src.utils.schema import TaskStatus, UserStatus
+from src.utils.config import Config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,10 +35,26 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif user_db.status == UserStatus.BLACKLISTED:
         return  # Ignore
 
+    # Create Web App Button
+    kb = [
+        [KeyboardButton("Abrir App de Tareas 🌴", web_app=WebAppInfo(url=Config.WEBAPP_URL))]
+    ]
+    reply_markup = ReplyKeyboardMarkup(kb, resize_keyboard=True)
+
     await update.message.reply_html(
         f"¡Hola {user.mention_html()}! Soy Maui, tu asistente de tareas inteligente. 🌴\n"
         f"Simplemente envíame un mensaje (texto o voz) describiendo lo que necesitas hacer, "
-        f"y yo lo organizaré por ti."
+        f"y yo lo organizaré por ti.",
+        reply_markup=reply_markup
+    )
+
+
+async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send button to launch the Web App."""
+    kb = [[InlineKeyboardButton("Abrir App 🚀", web_app=WebAppInfo(url=Config.WEBAPP_URL))]]
+    await update.message.reply_text(
+        "Haz clic abajo para abrir la aplicación web:",
+        reply_markup=InlineKeyboardMarkup(kb)
     )
 
 
