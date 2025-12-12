@@ -88,7 +88,17 @@ class GeminiService(LLMProvider):
         - EDIT_TASK: Change details of a task (e.g., "postpone the meeting to Friday").
         - CREATE_LIST: Create a new list (e.g., "Create a shopping list", "New list called Project X").
         - SHARE_LIST: Share a list with someone (e.g., "Share shopping list with @juan").
+        - DELETE_LIST: Delete a list (e.g., "Delete shopping list", "Elimina lista compra").
         - UNKNOWN: Irrelevant input.
+
+        **Language Support:**
+        - You must assume the user might speak **English** or **Spanish**.
+        - Handle Spanish commands like "Elimina", "Borra", "Agrega", "Crea", "Completa", "Muestra", "Lista".
+        - "Elimina lista X" or "Borra lista X" -> DELETE_LIST.
+        - "Elimina tarea X" or "Borra tarea X" -> CANCEL_TASK.
+        - "Agrega", "Nueva", "Pon" -> ADD_TASK.
+        - "Que tengo", "Mis tareas", "Pendientes" -> QUERY_TASKS.
+        - If "todas" or "everything", map to "ALL".
 
         Output matching the JSON schema:
         - 'intent': One of the above.
@@ -99,6 +109,7 @@ class GeminiService(LLMProvider):
             - For CANCEL/COMPLETE/EDIT: Key phrase to find the task.
             - If user says "I bought bread" or "Mark buying bread as done", the target is "buying bread" or "bread".
             - If "cancel everything", set to "ALL".
+            - For DELETE_LIST: The name of the list. If "delete all lists", set to "ALL".
         - 'formatted_task':
             - 'title': The task title.
             - 'list_name': The EXACT name of the list if specified. DO NOT TRANSLATE.

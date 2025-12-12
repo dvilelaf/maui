@@ -249,6 +249,12 @@ async def test_share_list_edge_cases(test_db, mock_notify):
     owner = UserManager.get_or_create_user(800, "owner")
     l = TaskManager.create_list(800, "My List")
 
+    # 0. Share by Telegram ID
+    UserManager.get_or_create_user(855, "id_user")
+    success, msg = await TaskManager.share_list(800, l.id, "855")
+    assert success
+    assert "id_user" in msg
+
     # 1. Not found
     success, msg = await TaskManager.share_list(800, l.id, "nobody")
     assert not success
@@ -306,10 +312,23 @@ async def test_get_list_members(test_db, mock_notify):
     # Accept invite
     await TaskManager.respond_to_invite(601, l.id, True)
 
+    assert TaskManager.is_user_in_list(601, l.id) is True
+
     members = TaskManager.get_list_members(l.id)
     assert len(members) == 2
     assert owner in members
     assert member in members
+
+def test_edit_list(test_db, user):
+    l = TaskManager.create_list(user.telegram_id, "Old Name")
+    # Owner rename
+    assert TaskManager.edit_list(user.telegram_id, l.id, "New Name") is True
+    assert TaskList.get_by_id(l.id).title == "New Name"
+
+    # Unauthorized rename
+    other = UserManager.get_or_create_user(999, "hacker")
+    assert TaskManager.edit_list(999, l.id, "Hacked Name") is False
+    assert TaskList.get_by_id(l.id).title == "New Name"
 
 def test_kick_user_error(test_db, mocker):
     from src.tools.admin import kick_user

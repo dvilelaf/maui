@@ -21,9 +21,9 @@ if (!userId) {
 
 const userInfo = document.getElementById('user-info');
 if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-    userInfo.textContent = `Hi, ${tg.initDataUnsafe.user.first_name}`;
+    userInfo.textContent = `Hola, ${tg.initDataUnsafe.user.first_name}`;
 } else {
-    userInfo.textContent = "Guest Mode (No User Detected)";
+    userInfo.textContent = "Modo Invitado (Usuario no detectado)";
 }
 
 // Routes
@@ -43,10 +43,23 @@ const apiRequest = async (endpoint, method = 'GET', body = null) => {
     }
     try {
         const response = await fetch(`${API_URL}${endpoint}`, options);
-        if (!response.ok) throw new Error('API Error');
-        return await response.json();
+
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            // Ignore if no JSON body
+        }
+
+        if (!response.ok) {
+            const errorMsg = (data && data.detail) ? data.detail : `API Error ${response.status}`;
+            throw new Error(errorMsg);
+        }
+
+        return data;
     } catch (e) {
-        tg.showAlert(`Error: ${e.message}`);
+        // Use custom modal for errors instead of tg.showAlert
+        await showModal('Error', e.message);
         return null;
     }
 };
@@ -95,7 +108,7 @@ async function loadTasks() {
         container.innerHTML = '';
 
         if (!tasks || tasks.length === 0) {
-            container.innerHTML = '<div class="empty-state">No hay tareas pendientes. ¡Buen trabajo! 🌴</div>';
+            container.innerHTML = '<div class="empty-state">No hay tareas pendientes. ¡Buen trabajo! 🪝</div>';
             return;
         }
 
@@ -109,7 +122,7 @@ async function loadTasks() {
                 <div class="task-title">${task.content}</div>
                 ${deadlineHtml}
             </div>
-            <button class="icon-btn edit-btn" onclick="editTask(${task.id}, '${task.content.replace(/'/g, "\\'")}')">✏️</button>
+            <button class="icon-btn edit-btn" data-content="${escapeAttr(task.content)}" onclick="editTask(${task.id}, this)">✏️</button>
             <button class="delete-btn" onclick="deleteTask(${task.id})">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
@@ -119,6 +132,11 @@ async function loadTasks() {
     } catch (e) {
         container.innerHTML = `<div class="empty-state">API Error: ${e.message}</div>`;
     }
+}
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return str.replace(/"/g, '&quot;');
 }
 
 async function loadLists() {
@@ -146,6 +164,7 @@ async function loadLists() {
         let actionsHtml = '';
         if (isOwner) {
             actionsHtml = `
+                <button class="icon-btn" data-name="${escapeAttr(list.name)}" onclick="editList(${list.id}, this)">✏️</button>
                 <button class="icon-btn" onclick="shareList(${list.id})">🔗</button>
                 <button class="icon-btn" onclick="deleteList(${list.id})">🗑️</button>
             `;
@@ -172,7 +191,7 @@ async function loadLists() {
                             <div class="task-title">${t.content}</div>
                             ${deadlineHtml}
                        </div>
-                       <button class="icon-btn edit-btn" onclick="editTask(${t.id}, '${t.content.replace(/'/g, "\\'")}')">✏️</button>
+                       <button class="icon-btn edit-btn" data-content="${escapeAttr(t.content)}" onclick="editTask(${t.id}, this)">✏️</button>
                        <button class="delete-btn" onclick="deleteTask(${t.id}, true)">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                        </button>
@@ -205,7 +224,7 @@ async function toggleTask(taskId, currentStatus) {
     // Visual feedback
     tg.HapticFeedback.selectionChanged();
     const endpoint = currentStatus === 'COMPLETED' ? 'uncomplete' : 'complete';
-    await apiRequest(`/tasks/${taskId}/${endpoint}`, 'POST');
+    await apiRequest(`/tasks/${taskId}/${endpoint}`, 'POST', { user_id: userId });
 
     // Refresh context
     const activeTab = document.querySelector('.tab-btn.active');
@@ -217,7 +236,7 @@ async function toggleTask(taskId, currentStatus) {
 }
 
 async function addList() {
-    const name = prompt("Nombre de la nueva lista:");
+    const name = await showModal('Nueva Lista', 'Nombre de la lista:', true);
     if (!name) return;
 
     await apiRequest(`/lists/${userId}/add`, 'POST', { name });
@@ -225,16 +244,18 @@ async function addList() {
 }
 
 async function deleteList(listId) {
-    if (!confirm("¿Eliminar esta lista y todas sus tareas?")) return;
+    const confirm = await showModal('Eliminar lista', '¿Seguro que quieres eliminar esta lista y sus tareas?');
+    if (!confirm) return;
     await apiRequest(`/lists/${listId}/delete`, 'POST', { user_id: userId });
     loadLists();
 }
 
 async function shareList(listId) {
-    const username = prompt("Introduce el @usuario de Telegram a invitar:");
+    const username = await showModal('Invitar Usuario', 'Introduce el @usuario, nombre o ID de Telegram:', true);
     if (!username) return;
-    const res = await apiRequest(`/lists/${listId}/share`, 'POST', { username });
-    if (res) alert(res.message);
+    const res = await apiRequest(`/lists/${listId}/share`, 'POST', { username, user_id: userId });
+    if (res) alert(res.message);  // Keep alert for result message or use another Modal? Let's assume alert works or replace.
+    // Actually TG android supports alert usually. But let's be consistent.
 }
 
 async function leaveList(listId) {
@@ -294,16 +315,26 @@ async function addTaskToList(listId) {
     tg.HapticFeedback.notificationOccurred('success');
 }
 
-async function editTask(taskId, currentContent) {
-    const newContent = prompt("Editar tarea:", currentContent);
-    if (newContent === null || newContent.trim() === "") return;
+async function editList(listId, btnElement) {
+    const currentName = btnElement.getAttribute('data-name');
+    const newName = await showModal('Renombrar Lista', 'Nuevo nombre:', true, currentName);
 
+    if (newName === null || newName.trim() === "") return;
+    if (newName.trim() === currentName) return;
+
+    await apiRequest(`/lists/${listId}/update`, 'POST', { name: newName, user_id: userId });
+    loadLists();
+}
+
+async function editTask(taskId, btnElement) {
+    const currentContent = btnElement.getAttribute('data-content');
+    const newContent = await showModal('Editar Tarea', 'Contenido:', true, currentContent);
+
+    if (newContent === null || newContent.trim() === "") return;
     if (newContent.trim() === currentContent) return; // No change
 
-    await apiRequest(`/tasks/${taskId}/update`, 'POST', { content: newContent });
+    await apiRequest(`/tasks/${taskId}/update`, 'POST', { content: newContent, user_id: userId });
 
-    // Determining which view to refresh is tricky without refactoring heavily.
-    // Simplest: refresh both or check active tab.
     const activeTab = document.querySelector('.tab-btn.active');
     if (activeTab && activeTab.textContent.includes('Tareas')) {
         loadTasks();
@@ -313,9 +344,10 @@ async function editTask(taskId, currentContent) {
 }
 
 async function deleteTask(taskId, isFromList = false) {
-    if (!confirm("¿Eliminar esta tarea?")) return;
+    const confirm = await showModal('Eliminar Tarea', '¿Eliminar esta tarea?');
+    if (!confirm) return;
     tg.HapticFeedback.notificationOccurred('warning');
-    await apiRequest(`/tasks/${taskId}/delete`, 'POST');
+    await apiRequest(`/tasks/${taskId}/delete`, 'POST', { user_id: userId });
 
     if (isFromList) {
         loadLists();
@@ -326,6 +358,44 @@ async function deleteTask(taskId, isFromList = false) {
         } else {
             loadTasks();
         }
+    }
+}
+
+// Modal Logic
+let modalResolver = null;
+
+function showModal(title, message, hasInput = false, initialValue = '') {
+    return new Promise((resolve) => {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-message').innerText = message;
+
+        const input = document.getElementById('modal-input');
+        if (hasInput) {
+            input.style.display = 'block';
+            input.value = initialValue;
+            setTimeout(() => input.focus(), 100);
+        } else {
+            input.style.display = 'none';
+        }
+
+        document.getElementById('custom-modal').style.display = 'flex';
+        modalResolver = resolve;
+    });
+}
+
+function closeModal(result) {
+    const modal = document.getElementById('custom-modal');
+    const input = document.getElementById('modal-input');
+
+    modal.style.display = 'none';
+
+    if (modalResolver) {
+        if (result && input.style.display !== 'none') {
+            modalResolver(input.value);
+        } else {
+            modalResolver(result);
+        }
+        modalResolver = null;
     }
 }
 

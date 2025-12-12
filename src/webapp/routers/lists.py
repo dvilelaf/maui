@@ -19,6 +19,7 @@ class ListCreate(BaseModel):
 
 class ShareRequest(BaseModel):
     username: str
+    user_id: int
 
 # Endpoints
 @router.get("/{user_id}", response_model=List[ListResponse])
@@ -65,9 +66,21 @@ async def leave_list(list_id: int, user_id: int = Body(..., embed=True)):
          raise HTTPException(status_code=400, detail=msg)
     return {"status": "success", "message": msg}
 
+class ListUpdate(BaseModel):
+    name: str
+    user_id: int
+
+# Endpoints
+@router.post("/{list_id}/update")
+async def update_list(list_id: int, update: ListUpdate):
+    success = coordinator.task_manager.edit_list(update.user_id, list_id, update.name)
+    if not success:
+         raise HTTPException(status_code=403, detail="Failed to rename list or permission denied")
+    return {"status": "success"}
+
 @router.post("/{list_id}/share")
-async def share_list(list_id: int, body: ShareRequest, user_id: int = Body(..., embed=True)):
-    success, msg = await coordinator.task_manager.share_list(user_id, list_id, body.username)
+async def share_list(list_id: int, body: ShareRequest):
+    success, msg = await coordinator.task_manager.share_list(body.user_id, list_id, body.username)
     if not success:
          raise HTTPException(status_code=400, detail=msg)
     return {"status": "success", "message": msg}

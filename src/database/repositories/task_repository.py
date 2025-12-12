@@ -271,6 +271,10 @@ class TaskManager:
 
         target_user = User.get_or_none(User.username == query_str)
 
+        # Fallback: Try Telegram ID if numeric
+        if not target_user and query_str.isdigit():
+            target_user = User.get_or_none(User.telegram_id == int(query_str))
+
         if not target_user:
             candidates = list(
                 User.select().where(
@@ -497,21 +501,94 @@ class TaskManager:
         return owned + shared
 
     @staticmethod
+    def is_user_in_list(user_id: int, list_id: int) -> bool:
+        lst = TaskList.get_or_none(TaskList.id == list_id)
+        if not lst:
+            return False
+        if lst.owner.telegram_id == user_id:
+            return True
+
+        access = SharedAccess.get_or_none(
+            (SharedAccess.task_list == list_id) &
+            (SharedAccess.user == user_id) &
+            (SharedAccess.status == "ACCEPTED")
+        )
+        return access is not None
+
+    @staticmethod
+    def get_list_members(list_id: int) -> List[User]:
+        # Return owner + accepted sharers
+        lst = TaskList.get_or_none(TaskList.id == list_id)
+        if not lst:
+            return []
+
+        users = [lst.owner]
+        shared = (
+            User.select()
+            .join(SharedAccess)
+            .where((SharedAccess.task_list == list_id) & (SharedAccess.status == "ACCEPTED"))
+        )
+        users.extend(list(shared))
+        return users
+
+    @staticmethod
+    def delete_all_lists(user_id: int) -> int:
+        """Deletes all lists owned by the user. Returns count of deleted lists."""
+        try:
+            # Get lists owned by user
+            lists = TaskList.select().where(TaskList.owner == user_id)
+            count = 0
+            for lst in lists:
+                # Reuse delete_list logic for safety/consistency
+                if TaskManager.delete_list(user_id, lst.id):
+                    count += 1
+            logger.info(f"Deleted {count} lists for User={user_id}")
+            return count
+        except Exception as e:
+            logger.error(f"Error deleting all lists: {e}")
+            return 0
+
+    @staticmethod
     def delete_list(user_id: int, list_id: int) -> bool:
         try:
-            lst = TaskList.get_or_none(TaskList.id == list_id)
-            if not lst:
+            target_list = TaskList.get_by_id(list_id)
+            if target_list.owner_id != user_id:
+                logger.warning(f"Unauthorized list delete attempt by {user_id}")
                 return False
 
-            if lst.owner.telegram_id != user_id:
-                return False
+            # Delete list (cascade deletes tasks usually, but let's be safe)
+            # Peewee cascade depends on foreign key definition.
+            # Explicit delete of tasks first if needed, but our model might have ON DELETE CASCADE
+            # Let's rely on model definition or delete manually to be safe?
+            # actually peewee's delete_instance recursive=True does the trick usually
 
-            Task.delete().where(Task.task_list == list_id).execute()
-            SharedAccess.delete().where(SharedAccess.task_list == list_id).execute()
-            ls_count = lst.delete_instance()
-            return ls_count > 0
+            # Delete associated SharedAccess entries
+            SharedAccess.delete().where(SharedAccess.task_list == target_list).execute()
+
+            # Delete tasks
+            Task.delete().where(Task.task_list == target_list).execute()
+
+            target_list.delete_instance()
+            logger.info(f"List DELETED: ID={list_id} by User={user_id}")
+            return True
         except Exception as e:
-            logger.error(f"Error deleting list {list_id}: {e}")
+            logger.error(f"Error deleting list: {e}")
+            return False
+
+    @staticmethod
+    def edit_list(user_id: int, list_id: int, new_name: str) -> bool:
+        try:
+            target_list = TaskList.get_by_id(list_id)
+            if target_list.owner_id != user_id:
+                logger.warning(f"Unauthorized list rename attempt by {user_id}")
+                return False
+
+            target_list.title = new_name
+            target_list.save()
+            logger.info(f"List RENAMED: ID={list_id} NewName='{new_name}' by User={user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error renaming list: {e}")
             return False
 
     @staticmethod

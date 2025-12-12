@@ -26,7 +26,16 @@ class GroqProvider(LLMProvider):
         Your goal is to extract task details or identify commands from the user's text input.
 
         Analyze the input and classify the intent into:
-        ADD_TASK, QUERY_TASKS, CANCEL_TASK, COMPLETE_TASK, EDIT_TASK, CREATE_LIST, SHARE_LIST, JOIN_LIST, REJECT_LIST, LEAVE_LIST, UNKNOWN.
+        ADD_TASK, QUERY_TASKS, CANCEL_TASK, COMPLETE_TASK, EDIT_TASK, CREATE_LIST, SHARE_LIST, JOIN_LIST, REJECT_LIST, LEAVE_LIST, DELETE_LIST, UNKNOWN.
+
+        **Language Support:**
+        - You must assume the user might speak **English** or **Spanish**.
+        - Handle Spanish commands like "Elimina", "Borra", "Agrega", "Crea", "Completa", "Muestra", "Lista".
+        - "Elimina lista X" or "Borra lista X" -> DELETE_LIST.
+        - "Elimina tarea X" or "Borra tarea X" -> CANCEL_TASK.
+        - "Agrega", "Nueva", "Pon" -> ADD_TASK.
+        - "Que tengo", "Mis tareas", "Pendientes" -> QUERY_TASKS.
+        - If "todas" or "everything", map to "ALL".
 
         Output must be valid JSON matching this schema:
         {{
@@ -34,7 +43,7 @@ class GroqProvider(LLMProvider):
           "is_relevant": "boolean",
           "time_filter": "string (optional enum: TODAY, WEEK, MONTH, YEAR, ALL)",
           "priority_filter": "string (optional enum: LOW, MEDIUM, HIGH, URGENT)",
-          "target_search_term": "string (optional)",
+          "target_search_term": "string (optional. For DELETE_LIST: List name or 'ALL'. For others: search phrase.)",
           "formatted_task": {{
             "title": "string",
             "deadline": "string (ISO datetime if mentioned)",

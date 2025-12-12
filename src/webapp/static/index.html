@@ -16,7 +16,7 @@
 <body>
     <div id="app">
         <header>
-            <h1>Maui 🌴</h1>
+            <h1>Maui 🪝</h1>
             <div id="user-info">Loading...</div>
         </header>
 
@@ -52,6 +52,22 @@
                 <!-- Lists injected here -->
             </div>
         </main>
+    </div>
+
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <h3 id="modal-title">Title</h3>
+            <div class="modal-body">
+                <p id="modal-message"></p>
+                <input type="text" id="modal-input" placeholder="Value"
+                    style="display:none; width: 100%; box-sizing: border-box; margin-top: 10px; padding: 8px;">
+            </div>
+            <div class="modal-actions">
+                <button id="modal-cancel-btn" onclick="closeModal(false)">Cancelar</button>
+                <button id="modal-confirm-btn" onclick="closeModal(true)" class="primary-btn">Confirmar</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

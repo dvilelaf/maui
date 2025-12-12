@@ -16,6 +16,7 @@ class UserIntent(str, Enum):
     JOIN_LIST = "JOIN_LIST"
     REJECT_LIST = "REJECT_LIST"
     LEAVE_LIST = "LEAVE_LIST"
+    DELETE_LIST = "DELETE_LIST"
     UNKNOWN = "UNKNOWN"
 
 

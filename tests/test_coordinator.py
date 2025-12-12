@@ -172,6 +172,37 @@ async def test_handle_complete_task(coordinator, user):
     assert task_db.status == TaskStatus.COMPLETED
 
 @pytest.mark.asyncio
+async def test_handle_delete_list(coordinator, user):
+    """Test DELETE_LIST intent."""
+    l = TaskManager.create_list(user.telegram_id, "DeleteMe")
+    extraction = TaskExtractionResponse(
+        intent=UserIntent.DELETE_LIST,
+        is_relevant=True,
+        target_search_term="DeleteMe"
+    )
+    response = await coordinator.handle_message(user.telegram_id, "user", "delete list DeleteMe", extraction=extraction)
+    assert "Lista eliminada" in response
+    assert TaskList.get_or_none(TaskList.id == l.id) is None
+
+    assert "Lista eliminada" in response
+    assert TaskList.get_or_none(TaskList.id == l.id) is None
+
+@pytest.mark.asyncio
+async def test_handle_delete_all_lists(coordinator, user):
+    """Test DELETE_LIST intent with ALL target."""
+    TaskManager.create_list(user.telegram_id, "L1")
+    TaskManager.create_list(user.telegram_id, "L2")
+
+    extraction = TaskExtractionResponse(
+        intent=UserIntent.DELETE_LIST,
+        is_relevant=True,
+        target_search_term="ALL"
+    )
+    response = await coordinator.handle_message(user.telegram_id, "user", "delete all lists", extraction=extraction)
+    assert "eliminado 2 listas" in response
+    assert TaskList.select().where(TaskList.owner == user.telegram_id).count() == 0
+
+@pytest.mark.asyncio
 async def test_handle_cancel_task(coordinator, user):
     task = TaskManager.add_task(user.telegram_id, TaskSchema(title="Meeting"))
 
@@ -247,7 +278,22 @@ async def test_create_list_fallback(coordinator, mocker):
         formatted_task=None # No title
     )
     resp = await coordinator.handle_message(123, "test", "irrelevant", extraction=extract)
+    resp = await coordinator.handle_message(123, "test", "irrelevant", extraction=extract)
     assert "Nueva Lista" in resp
+
+@pytest.mark.asyncio
+async def test_create_list_fallback_target(coordinator, mocker):
+    """Test CREATE_LIST where name is in target_search_term."""
+    mocker.patch.object(coordinator.user_manager, "get_or_create_user", return_value=MagicMock(status=UserStatus.WHITELISTED))
+    extract = TaskExtractionResponse(
+        intent=UserIntent.CREATE_LIST,
+        is_relevant=True,
+        target_search_term="TargetName",
+        formatted_task=None
+    )
+    resp = await coordinator.handle_message(123, "test", "irrelevant", extraction=extract)
+    assert "TargetName" in resp
+    assert TaskManager.find_list_by_name(123, "TargetName") is not None
 
 @pytest.mark.asyncio
 async def test_share_list_errors(coordinator, mocker):

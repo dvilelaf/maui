@@ -15,6 +15,7 @@ class TaskUpdate(BaseModel):
     content: Optional[str] = None
     status: Optional[str] = None
     deadline: Optional[str] = None
+    user_id: int
 
 class TaskResponse(BaseModel):
     id: int
@@ -72,6 +73,7 @@ async def add_task(user_id: int, task: TaskCreate):
 
 @router.post("/{task_id}/complete")
 async def complete_task(task_id: int, user_id: int = Body(..., embed=True)):
+    # This works fine as a single body param
     success = coordinator.task_manager.update_task_status(user_id, task_id, TaskStatus.COMPLETED)
     if not success:
          raise HTTPException(status_code=404, detail="Task not found or permission denied")
@@ -92,10 +94,11 @@ async def delete_task(task_id: int, user_id: int = Body(..., embed=True)):
     return {"status": "success"}
 
 @router.post("/{task_id}/update")
-async def update_task_content(task_id: int, update: TaskUpdate, user_id: int = Body(..., embed=True)):
+async def update_task_content(task_id: int, update: TaskUpdate):
+    # update includes user_id now
     if update.content:
         schema = TaskSchema(title=update.content)
-        success = coordinator.task_manager.edit_task(user_id, task_id, schema)
+        success = coordinator.task_manager.edit_task(update.user_id, task_id, schema)
         if not success:
             raise HTTPException(status_code=404, detail="Task not found, permission denied, or no changes")
 

@@ -68,11 +68,11 @@ class Coordinator:
 
         # Handle Intents
         if extraction.intent == UserIntent.CREATE_LIST:
-            list_name = (
-                extraction.formatted_task.title
-                if extraction.formatted_task
-                else "Nueva Lista"
-            )
+            list_name = "Nueva Lista"
+            if extraction.formatted_task and extraction.formatted_task.title:
+                 list_name = extraction.formatted_task.title
+            elif extraction.target_search_term:
+                 list_name = extraction.target_search_term
             new_list = self.task_manager.create_list(user_id, list_name)
             return f"📋 Lista creada: *{new_list.title}*"
 
@@ -170,6 +170,28 @@ class Coordinator:
                      return f"❌ No encontré la lista '{term}'."
                  success, msg = await self.task_manager.leave_list(user_id, tlist.id)
                  return ("✅ " if success else "❌ ") + msg
+
+        if extraction.intent == UserIntent.DELETE_LIST:
+            term = extraction.target_search_term
+            if not term:
+                return "⚠️ Dime qué lista quieres eliminar. Ej: 'Eliminar lista Compra'"
+
+            if term == "ALL" or term == "todas":
+                 count = self.task_manager.delete_all_lists(user_id)
+                 if count > 0:
+                     return f"🗑️ Se han eliminado {count} listas."
+                 else:
+                     return "No tienes listas para eliminar."
+
+            tlist = self.task_manager.find_list_by_name(user_id, term)
+            if not tlist:
+                return f"❌ No encontré la lista '{term}'."
+
+            success = self.task_manager.delete_list(user_id, tlist.id)
+            if success:
+                return f"🗑️ Lista eliminada: *{tlist.title}*"
+            else:
+                return "❌ No se pudo eliminar la lista. Asegúrate de ser el propietario."
 
         # Handle Task Modification Intents
         if extraction.intent in (
