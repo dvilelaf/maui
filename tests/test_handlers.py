@@ -45,7 +45,7 @@ async def test_start_command(mock_update, mock_context, test_db, mocker):
     # I need to see how `coordinator` is accessed in handlers.py.
     # Assuming it's imported globally or I need to patch it.
 
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
 
     await start_command(mock_update, mock_context)
 
@@ -66,7 +66,7 @@ async def test_start_command(mock_update, mock_context, test_db, mocker):
 
 @pytest.mark.asyncio
 async def test_get_tasks_command(mock_update, mock_context, test_db, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.get_task_summary.return_value = "No pending tasks"
 
     await get_tasks_command(mock_update, mock_context)
@@ -85,7 +85,7 @@ async def test_add_task_command_no_args(mock_update, mock_context):
 @pytest.mark.asyncio
 async def test_add_task_command_success(mock_update, mock_context, mocker):
     mock_context.args = ["Buy", "Milk"]
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     # mock handle_message return
     mock_coord.handle_message = AsyncMock(return_value="Task Added")
 
@@ -96,7 +96,7 @@ async def test_add_task_command_success(mock_update, mock_context, mocker):
 
 @pytest.mark.asyncio
 async def test_get_lists_command(mock_update, mock_context, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.get_lists_summary.return_value = "Lists Summary"
 
     await get_lists_command(mock_update, mock_context)
@@ -113,7 +113,7 @@ async def test_help_command(mock_update, mock_context):
 @pytest.mark.asyncio
 async def test_handle_message_text(mock_update, mock_context, mocker):
     mock_update.message.text = "Hello"
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.handle_message = AsyncMock(return_value="Response")
 
     from src.bot.handlers import handle_message
@@ -141,7 +141,7 @@ async def test_handle_voice(mock_update, mock_context, mocker):
     mock_file.download_as_bytearray.return_value = b"audio_data"
     mock_context.bot.get_file.return_value = mock_file
 
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.handle_message = AsyncMock(return_value="Voice Response")
 
     from src.bot.handlers import handle_voice
@@ -163,7 +163,7 @@ async def test_handle_voice_no_voice(mock_update, mock_context):
 @pytest.mark.asyncio
 async def test_complete_task_command_success(mock_update, mock_context, mocker):
     mock_context.args = ["1"]
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.task_manager.update_task_status.return_value = True
 
     from src.bot.handlers import complete_task_command
@@ -175,7 +175,7 @@ async def test_complete_task_command_success(mock_update, mock_context, mocker):
 @pytest.mark.asyncio
 async def test_complete_task_command_fail(mock_update, mock_context, mocker):
     mock_context.args = ["99"]
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.task_manager.update_task_status.return_value = False
 
     from src.bot.handlers import complete_task_command
@@ -193,7 +193,7 @@ async def test_complete_task_command_invalid(mock_update, mock_context):
 @pytest.mark.asyncio
 async def test_cancel_task_command_success(mock_update, mock_context, mocker):
     mock_context.args = ["1"]
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_coord.task_manager.update_task_status.return_value = True
 
     from src.bot.handlers import cancel_task_command
@@ -204,7 +204,7 @@ async def test_cancel_task_command_success(mock_update, mock_context, mocker):
 
 @pytest.mark.asyncio
 async def test_handle_voice_error(mock_update, mock_context, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     # Simulate an error during processing
     mock_coord.handle_message.side_effect = Exception("Voice processing failed")
 
@@ -230,7 +230,7 @@ async def test_handle_voice_error(mock_update, mock_context, mocker):
 @pytest.mark.asyncio
 async def test_cancel_task_command_invalid(mock_update, mock_context, mocker):
     mock_context.args = ["invalid"]
-    mock_repo = mocker.patch("src.bot.handlers.coordinator.task_manager")
+    mock_repo = mocker.patch("src.bot.handlers.get_coordinator").return_value.task_manager
 
     from src.bot.handlers import cancel_task_command
     await cancel_task_command(mock_update, mock_context)
@@ -243,7 +243,7 @@ async def test_cancel_task_command_invalid(mock_update, mock_context, mocker):
 
 @pytest.mark.asyncio
 async def test_start_command_pending_user(mock_update, mock_context, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_user = mock_coord.user_manager.get_or_create_user.return_value
     mock_user.status = UserStatus.PENDING
     mock_user.first_name = "PendingUser"
@@ -258,7 +258,7 @@ async def test_start_command_pending_user(mock_update, mock_context, mocker):
 
 @pytest.mark.asyncio
 async def test_start_command_blacklisted_user(mock_update, mock_context, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     mock_user = mock_coord.user_manager.get_or_create_user.return_value
     mock_user.status = UserStatus.BLACKLISTED
 
@@ -273,7 +273,7 @@ async def test_start_command_blacklisted_user(mock_update, mock_context, mocker)
 @pytest.mark.asyncio
 async def test_cancel_task_command_fail(mock_update, mock_context, mocker):
     mock_context.args = ["999"]
-    mock_coord = mocker.patch("src.bot.handlers.coordinator")
+    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     # Return False -> Not found or failed
     mock_coord.task_manager.update_task_status.return_value = False
 

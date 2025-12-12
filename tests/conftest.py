@@ -38,3 +38,16 @@ def mock_bot(mocker):
     # Mock telegram.Bot
     mock_bot = mocker.patch("telegram.Bot")
     return mock_bot.return_value
+
+@pytest.fixture(autouse=True)
+def mock_config(mocker):
+    """
+    Ensure Config is mocked to safe defaults for all tests,
+    overriding any local .env values that might cause crashes (like missing keys).
+    """
+    # Patch the RAW fields because they are what backend logic reads or what properties use
+    from src.utils.config import Config
+    mocker.patch.object(Config, "LLM_PROVIDER_RAW", "gemini")
+    mocker.patch.object(Config, "GEMINI_API_KEYS_RAW", "fake_key")
+    mocker.patch.object(Config, "GROQ_API_KEY", "fake_groq_key")
+    return Config

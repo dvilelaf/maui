@@ -7,14 +7,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Initialize coordinator
-coordinator = Coordinator()
+_coordinator = None
+
+def get_coordinator():
+    global _coordinator
+    if _coordinator is None:
+        _coordinator = Coordinator()
+    return _coordinator
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a welcome message when the command /start is issued."""
     user = update.effective_user
     # Ensure user is in DB
-    user_db = coordinator.user_manager.get_or_create_user(
+    user_db = get_coordinator().user_manager.get_or_create_user(
         user.id, user.username, user.first_name, user.last_name
     )
 
@@ -60,7 +66,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_chat_action(action="typing")
 
-    response = await coordinator.handle_message(
+    response = await get_coordinator().handle_message(
         user_id=user.id,
         username=user.username,
         content=text,
@@ -87,7 +93,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_bytes = await new_file.download_as_bytearray()
 
     try:
-        response = await coordinator.handle_message(
+        response = await get_coordinator().handle_message(
             user_id=user.id,
             username=user.username,
             content=bytes(file_bytes),
@@ -106,21 +112,21 @@ async def get_tasks_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler for /tasks (and alias /list) command."""
     user = update.effective_user
     # Default to all tasks for now
-    response = coordinator.get_task_summary(user.id)
+    response = get_coordinator().get_task_summary(user.id)
     await update.message.reply_text(response, parse_mode="Markdown")
 
 
 async def get_lists_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler for /lists command."""
     user = update.effective_user
-    response = coordinator.get_lists_summary(user.id)
+    response = get_coordinator().get_lists_summary(user.id)
     await update.message.reply_text(response, parse_mode="Markdown")
 
 
 async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
-        if coordinator.task_manager.update_task_status(task_id, TaskStatus.COMPLETED):
+        if get_coordinator().task_manager.update_task_status(task_id, TaskStatus.COMPLETED):
             await update.message.reply_text(
                 f"✅ ¡Tarea {task_id} marcada como completada!"
             )
@@ -135,7 +141,7 @@ async def complete_task_command(update: Update, context: ContextTypes.DEFAULT_TY
 async def cancel_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_id = int(context.args[0])
-        success = coordinator.task_manager.update_task_status(task_id, "CANCELLED")
+        success = get_coordinator().task_manager.update_task_status(task_id, "CANCELLED")
         if success:
             await update.message.reply_text(f"🗑️ Tarea {task_id} cancelada.")
         else:
@@ -155,7 +161,7 @@ async def add_task_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_chat_action(action="typing")
 
-    response = await coordinator.handle_message(
+    response = await get_coordinator().handle_message(
         user_id=user.id,
         username=user.username,
         content=text,
