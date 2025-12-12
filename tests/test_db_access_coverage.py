@@ -1,6 +1,6 @@
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from src.database.access import (
     resolve_user,
     confirm_action,
@@ -122,13 +122,15 @@ def test_find_list_by_name(test_db):
     # Fallback
     assert TaskManager.find_list_by_name(600, "NonExistent").id in [l1.id, l2.id] # returns first found
 
-def test_share_list(test_db):
+@pytest.mark.asyncio
+async def test_share_list(test_db, mocker):
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     owner = User.create(telegram_id=700, username="owner700")
     other = User.create(telegram_id=701, username="other701", first_name="Other")
     tl = TaskList.create(title="Shared", owner=owner)
 
     # Share success
-    success, msg = TaskManager.share_list(tl.id, "other701")
+    success, msg = await TaskManager.share_list(tl.id, "other701")
     assert success
     assert "compartida" in msg
 
@@ -137,19 +139,19 @@ def test_share_list(test_db):
     assert other in members
 
     # Share duplicate
-    success, msg = TaskManager.share_list(tl.id, "other701")
+    success, msg = await TaskManager.share_list(tl.id, "other701")
     assert not success
     assert "ya está compartida" in msg
 
     # Share not found
-    success, msg = TaskManager.share_list(tl.id, "nobody")
+    success, msg = await TaskManager.share_list(tl.id, "nobody")
     assert not success
 
     # Fuzzy search multiple
     u3 = User.create(telegram_id=702, first_name="OtherName")
     u4 = User.create(telegram_id=703, first_name="OtherName")
 
-    success, msg = TaskManager.share_list(tl.id, "OtherName")
+    success, msg = await TaskManager.share_list(tl.id, "OtherName")
     assert success is False
     assert "varios usuarios" in msg
 

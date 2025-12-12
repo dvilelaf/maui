@@ -314,7 +314,7 @@ class TaskManager:
         return TaskList.create(title=title, owner=user_id)
 
     @staticmethod
-    def share_list(list_id: int, target_query: str) -> tuple[bool, str]:
+    async def share_list(list_id: int, target_query: str) -> tuple[bool, str]:
         """
         Share a list with a user found by username or name.
         Returns (Success, Message)
@@ -381,6 +381,19 @@ class TaskManager:
             task_list=list_id,
             status="ACCEPTED",  # Auto-accept for now to simplify, or PENDING if strict
         )
+
+        # Notify the recipient
+        try:
+             list_obj = TaskList.get_by_id(list_id)
+             owner = list_obj.owner
+             owner_name = owner.username or owner.first_name
+             await notify_user(
+                 target_user.telegram_id,
+                 f"📋 ¡Hola! @{owner_name} ha compartido la lista '*{list_obj.title}*' contigo."
+             )
+        except Exception as e:
+            logger.error(f"Failed to notify user shared: {e}")
+
         return (
             True,
             f"Lista compartida con @{target_user.username or target_user.first_name}.",

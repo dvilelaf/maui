@@ -1,6 +1,6 @@
 
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch, ANY, AsyncMock
 from src.tui.app import DatabaseMonitor
 from src.database.models import User, Task, TaskList
 from src.utils.schema import TaskStatus
@@ -134,19 +134,21 @@ async def test_resolve_user_edge(test_db):
     assert resolve_user("@num_user") == u
 
 @pytest.mark.asyncio
-async def test_share_list_fuzzy_fail(test_db):
+async def test_share_list_fuzzy_fail(test_db, mocker):
     from src.database.access import TaskManager
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
 
     # Create no users
     tl = TaskList.create(title="MyList", owner=User.create(telegram_id=1))
 
-    success, msg = TaskManager.share_list(tl.id, "NonExistent")
+    success, msg = await TaskManager.share_list(tl.id, "NonExistent")
     assert not success
     assert "no encontrado" in msg
 
 @pytest.mark.asyncio
-async def test_share_list_complex(test_db):
+async def test_share_list_complex(test_db, mocker):
     from src.database.access import TaskManager
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
 
     owner = User.create(telegram_id=3000)
     tl = TaskList.create(title="ShareComplex", owner=owner)
@@ -156,7 +158,7 @@ async def test_share_list_complex(test_db):
     u2 = User.create(telegram_id=3002, first_name="Johnny", username="u2")
 
     # Search "John" matches both fuzzy
-    success, msg = TaskManager.share_list(tl.id, "John")
+    success, msg = await TaskManager.share_list(tl.id, "John")
     assert success
     assert "u1" in msg or "John" in msg
 
@@ -166,7 +168,7 @@ async def test_share_list_complex(test_db):
     User.create(telegram_id=3005, first_name="Alex C", username="a5")
     User.create(telegram_id=3006, first_name="Alex D", username="a6")
 
-    success, msg = TaskManager.share_list(tl.id, "Alex")
+    success, msg = await TaskManager.share_list(tl.id, "Alex")
     assert not success
     assert "..." in msg
 

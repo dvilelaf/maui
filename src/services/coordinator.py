@@ -92,7 +92,7 @@ class Coordinator:
 
             results = []
             for username in extraction.formatted_task.shared_with:
-                success, msg = self.task_manager.share_list(target_list.id, username)
+                success, msg = await self.task_manager.share_list(target_list.id, username)
                 emoji = "✅" if success else "⚠️"
                 results.append(f"{emoji} {msg}")
 

@@ -55,14 +55,17 @@ def test_task_list_separation(test_db, user):
     assert len(list_tasks) == 1
     assert list_tasks[0].title == "Milk"
 
-def test_share_list(test_db, user):
+@pytest.mark.asyncio
+async def test_share_list(test_db, user, mocker):
+    # Mock notify
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     # Create another user
     other = UserManager.get_or_create_user(67890, "friend", "Best", "Friend")
 
     tlist = TaskManager.create_list(user.telegram_id, "Shared List")
 
     # Share exact match
-    success, msg = TaskManager.share_list(tlist.id, "friend")
+    success, msg = await TaskManager.share_list(tlist.id, "friend")
     assert success
     assert "compartida" in msg
 
@@ -71,14 +74,16 @@ def test_share_list(test_db, user):
     assert len(shared_lists) == 1
     assert shared_lists[0].title == "Shared List"
 
-def test_share_list_fuzzy(test_db, user):
+@pytest.mark.asyncio
+async def test_share_list_fuzzy(test_db, user, mocker):
     """Test fuzzy matching for sharing."""
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     UserManager.get_or_create_user(999, "dave123", "David", "Vilela")
 
     tlist = TaskManager.create_list(user.telegram_id, "Project")
 
     # Share by First Name
-    success, msg = TaskManager.share_list(tlist.id, "David")
+    success, msg = await TaskManager.share_list(tlist.id, "David")
     assert success
     assert "David" in msg or "dave123" in msg
 
@@ -240,27 +245,29 @@ def test_get_pending_tasks_filters(test_db):
     tasks_year = TaskManager.get_pending_tasks(701, TimeFilter.YEAR)
     assert len(tasks_year) == 4
 
-def test_share_list_edge_cases(test_db):
+@pytest.mark.asyncio
+async def test_share_list_edge_cases(test_db, mocker):
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     owner = UserManager.get_or_create_user(800, "owner")
     l = TaskManager.create_list(800, "My List")
 
     # 1. Not found
-    success, msg = TaskManager.share_list(l.id, "nobody")
+    success, msg = await TaskManager.share_list(l.id, "nobody")
     assert not success
     assert "no encontrado" in msg
 
     # 2. Multiple matches
     UserManager.get_or_create_user(801, "juan_perez")
     UserManager.get_or_create_user(802, "juan_lopez")
-    success, msg = TaskManager.share_list(l.id, "juan")
+    success, msg = await TaskManager.share_list(l.id, "juan")
     assert not success
     assert "varios usuarios" in msg
 
     # 3. Already shared
     UserManager.get_or_create_user(803, "unique_friend")
-    TaskManager.share_list(l.id, "unique_friend")
+    await TaskManager.share_list(l.id, "unique_friend")
     # Try again
-    success, msg = TaskManager.share_list(l.id, "unique_friend")
+    success, msg = await TaskManager.share_list(l.id, "unique_friend")
     assert not success
     assert "ya está compartida" in msg
 
@@ -291,12 +298,14 @@ def test_user_update_fields(test_db):
     u3 = UserManager.get_or_create_user(555, "initial", "UpdatedFirst", "UpdatedLast")
     assert u3.last_name == "UpdatedLast"
 
-def test_get_list_members(test_db):
+@pytest.mark.asyncio
+async def test_get_list_members(test_db, mocker):
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     owner = UserManager.get_or_create_user(600, "owner")
     l = TaskManager.create_list(600, "Membership List")
 
     member = UserManager.get_or_create_user(601, "member")
-    TaskManager.share_list(l.id, "member")
+    await TaskManager.share_list(l.id, "member")
     # share_list auto-accepts in current impl
 
     members = TaskManager.get_list_members(l.id)

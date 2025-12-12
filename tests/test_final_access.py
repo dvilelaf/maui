@@ -1,7 +1,11 @@
 from src.database.access import TaskManager
 from src.database.models import User, Task, TaskList, SharedAccess
+import pytest
+from unittest.mock import AsyncMock
 
-def test_access_coverage_final(test_db):
+@pytest.mark.asyncio
+async def test_access_coverage_final(test_db, mocker):
+    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     # Line 229: get_or_none
     # We need to call get_or_none directly
     u = User.get_or_none(User.telegram_id == 99999)
@@ -14,7 +18,7 @@ def test_access_coverage_final(test_db):
     tlist = TaskList.create(title="My List", owner=owner)
 
     # Search for non-existent user
-    success, msg = TaskManager.share_list(tlist.id, "@ghostuser")
+    success, msg = await TaskManager.share_list(tlist.id, "@ghostuser")
     assert success is False
     assert "no encontrado" in msg
 
