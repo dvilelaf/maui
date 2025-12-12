@@ -40,4 +40,14 @@ class UserManager:
             if not created:  # Only log update if it wasn't just created
                 logger.info(f"User UPDATED: ID={telegram_id} (@{username})")
 
+        # Config-based auto-whitelist
+        # This ensures that specific users are always whitelisted regardless of DB state
+        from src.utils.config import Config
+        from src.database.models import UserStatus
+
+        if telegram_id in Config.WHITELISTED_USERS and user.status != UserStatus.WHITELISTED:
+             user.status = UserStatus.WHITELISTED
+             user.save()
+             logger.info(f"User AUTO-WHITELISTED (Config): ID={telegram_id}")
+
         return user

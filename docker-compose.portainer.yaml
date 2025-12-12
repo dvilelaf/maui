@@ -13,6 +13,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - LOG_LEVEL=${LOG_LEVEL}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - WHITELISTED_USERS=${WHITELISTED_USERS}
 
   maui-webapp:
     image: dvilela/maui:latest

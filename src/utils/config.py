@@ -42,6 +42,20 @@ class Settings(BaseSettings):
             return []
         return [k.strip() for k in keys.split(",") if k.strip()]
 
+    # Whitelist Configuration
+    WHITELISTED_USERS_RAW: str = Field(default="", validation_alias="WHITELISTED_USERS")
+
+    @computed_field
+    @property
+    def WHITELISTED_USERS(self) -> List[int]:
+        users = self.WHITELISTED_USERS_RAW
+        if not users:
+            return []
+        try:
+            return [int(u.strip()) for u in users.split(",") if u.strip().isnumeric()]
+        except ValueError:
+            return []
+
     @computed_field
     @property
     def LLM_PROVIDER(self) -> str:
