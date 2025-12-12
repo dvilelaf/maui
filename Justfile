@@ -24,11 +24,14 @@ push:
     docker push dvilela/maui
 
 # Build and push
-ship: format check build push
+ship: format check security build push
 
 # Formatter & Linter
 check:
     uv run ruff check src
+
+security:
+    gitleaks detect --source . -v
 
 format:
     uv run ruff format src
