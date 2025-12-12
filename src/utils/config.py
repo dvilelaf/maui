@@ -1,5 +1,3 @@
-
-import os
 from typing import List, Optional
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,8 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     TELEGRAM_TOKEN: Optional[str] = Field(default=None)
 
@@ -60,6 +61,7 @@ class Settings(BaseSettings):
     @property
     def LLM_PROVIDER(self) -> str:
         return self.LLM_PROVIDER_RAW.lower()
+
 
 # Instantiate settings
 Config = Settings()

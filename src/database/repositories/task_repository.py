@@ -9,6 +9,7 @@ from src.services.notification_service import notify_user
 
 logger = logging.getLogger(__name__)
 
+
 class TaskManager:
     @staticmethod
     def add_task(user_id: int, task_data: TaskSchema) -> Optional[Task]:
@@ -57,7 +58,6 @@ class TaskManager:
         time_filter: TimeFilter = TimeFilter.ALL,
         priority_filter: str = None,
     ) -> List[Task]:
-
         query = (
             (Task.user == user_id)
             & (Task.status == TaskStatus.PENDING)
@@ -99,13 +99,14 @@ class TaskManager:
         return tasks
 
     @staticmethod
-    def get_user_tasks(
-        user_id: int,
-        sort_by: str = "deadline"
-    ) -> List[Task]:
+    def get_user_tasks(user_id: int, sort_by: str = "deadline") -> List[Task]:
         """Get all tasks (pending and completed) for a user, excluding tasks in lists."""
 
-        query = (Task.user == user_id) & (Task.task_list.is_null()) & (Task.status != "CANCELLED")
+        query = (
+            (Task.user == user_id)
+            & (Task.task_list.is_null())
+            & (Task.status != "CANCELLED")
+        )
         tasks = list(Task.select().where(query))
 
         priority_order = {"URGENT": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
@@ -135,11 +136,15 @@ class TaskManager:
             if task.task_list.owner_id == user_id:
                 return True
             # Check if member
-            is_member = SharedAccess.select().where(
-                (SharedAccess.task_list == task.task_list) &
-                (SharedAccess.user == user_id) &
-                (SharedAccess.status == "ACCEPTED")
-            ).exists()
+            is_member = (
+                SharedAccess.select()
+                .where(
+                    (SharedAccess.task_list == task.task_list)
+                    & (SharedAccess.user == user_id)
+                    & (SharedAccess.status == "ACCEPTED")
+                )
+                .exists()
+            )
             return is_member
 
         return False
@@ -226,7 +231,7 @@ class TaskManager:
         user_id: int, keyword: str, list_id: int = None
     ) -> List[Task]:
         # Secure search
-        query = (Task.status == TaskStatus.PENDING)
+        query = Task.status == TaskStatus.PENDING
 
         if list_id:
             # Check access to list
@@ -236,16 +241,20 @@ class TaskManager:
                 if tlist.owner_id == user_id:
                     has_access = True
                 else:
-                    has_access = SharedAccess.select().where(
-                        (SharedAccess.task_list == list_id) &
-                        (SharedAccess.user == user_id) &
-                        (SharedAccess.status == "ACCEPTED")
-                    ).exists()
+                    has_access = (
+                        SharedAccess.select()
+                        .where(
+                            (SharedAccess.task_list == list_id)
+                            & (SharedAccess.user == user_id)
+                            & (SharedAccess.status == "ACCEPTED")
+                        )
+                        .exists()
+                    )
 
             if not has_access:
                 return []
 
-            query &= (Task.task_list == list_id)
+            query &= Task.task_list == list_id
         else:
             # Only personal tasks
             query &= (Task.user == user_id) & (Task.task_list.is_null())
@@ -258,7 +267,9 @@ class TaskManager:
         return TaskList.create(title=title, owner=user_id)
 
     @staticmethod
-    async def share_list(user_id: int, list_id: int, target_query: str) -> tuple[bool, str]:
+    async def share_list(
+        user_id: int, list_id: int, target_query: str
+    ) -> tuple[bool, str]:
         # Validate ownership
         tlist = TaskList.get_or_none(TaskList.id == list_id)
         if not tlist:
@@ -331,13 +342,13 @@ class TaskManager:
         )
 
         try:
-             owner = tlist.owner
-             owner_name = owner.username or owner.first_name
-             await notify_user(
-                 target_user.telegram_id,
-                 f"📩 Has sido invitado por @{owner_name} a unirte a la lista '*{tlist.title}*'.\n"
-                 f"Usa `/join {list_id}` para unirte o `/reject {list_id}` para rechazar."
-             )
+            owner = tlist.owner
+            owner_name = owner.username or owner.first_name
+            await notify_user(
+                target_user.telegram_id,
+                f"📩 Has sido invitado por @{owner_name} a unirte a la lista '*{tlist.title}*'.\n"
+                f"Usa `/join {list_id}` para unirte o `/reject {list_id}` para rechazar.",
+            )
         except Exception as e:
             logger.error(f"Failed to notify user shared: {e}")
 
@@ -347,7 +358,9 @@ class TaskManager:
         )
 
     @staticmethod
-    async def respond_to_invite(user_id: int, list_id: int, accept: bool) -> tuple[bool, str]:
+    async def respond_to_invite(
+        user_id: int, list_id: int, accept: bool
+    ) -> tuple[bool, str]:
         user = User.get_or_none(User.telegram_id == user_id)
         if not user:
             return False, "Usuario no encontrado."
@@ -371,18 +384,18 @@ class TaskManager:
                 if m.telegram_id != user.telegram_id:
                     await notify_user(
                         m.telegram_id,
-                        f"👤 @{user_name} se ha unido a la lista '*{tlist.title}*'."
+                        f"👤 @{user_name} se ha unido a la lista '*{tlist.title}*'.",
                     )
             return True, f"Te has unido a la lista '*{tlist.title}*'."
         else:
             access.delete_instance()
             members = TaskManager.get_list_members(list_id)
             for m in members:
-                 if m.telegram_id != user.telegram_id:
-                     await notify_user(
+                if m.telegram_id != user.telegram_id:
+                    await notify_user(
                         m.telegram_id,
-                        f"👤 @{user_name} ha rechazado la invitación a '*{tlist.title}*'."
-                     )
+                        f"👤 @{user_name} ha rechazado la invitación a '*{tlist.title}*'.",
+                    )
             return True, f"Has rechazado la invitación a '*{tlist.title}*'."
 
     @staticmethod
@@ -405,7 +418,7 @@ class TaskManager:
                 if m.telegram_id != user.telegram_id:
                     await notify_user(
                         m.telegram_id,
-                        f"👋 @{user_name} ha salido de la lista '*{tlist.title}*'."
+                        f"👋 @{user_name} ha salido de la lista '*{tlist.title}*'.",
                     )
             return True, f"Has salido de la lista '*{tlist.title}*'."
 
@@ -413,7 +426,7 @@ class TaskManager:
             # Check if owner
             tlist = TaskList.get_or_none(TaskList.id == list_id)
             if tlist and tlist.owner_id == user_id:
-                 return False, "Como creador, no puedes salirte. Usa 'Borrar Lista'."
+                return False, "Como creador, no puedes salirte. Usa 'Borrar Lista'."
             return False, "No eres miembro de esta lista."
 
     @staticmethod
@@ -463,7 +476,16 @@ class TaskManager:
 
         def clean(s):
             stopwords = [
-                "lista", "list", "de", "la", "el", "the", "una", "un", "los", "las",
+                "lista",
+                "list",
+                "de",
+                "la",
+                "el",
+                "the",
+                "una",
+                "un",
+                "los",
+                "las",
             ]
             s = s.lower()
             for w in stopwords:
@@ -509,27 +531,11 @@ class TaskManager:
             return True
 
         access = SharedAccess.get_or_none(
-            (SharedAccess.task_list == list_id) &
-            (SharedAccess.user == user_id) &
-            (SharedAccess.status == "ACCEPTED")
+            (SharedAccess.task_list == list_id)
+            & (SharedAccess.user == user_id)
+            & (SharedAccess.status == "ACCEPTED")
         )
         return access is not None
-
-    @staticmethod
-    def get_list_members(list_id: int) -> List[User]:
-        # Return owner + accepted sharers
-        lst = TaskList.get_or_none(TaskList.id == list_id)
-        if not lst:
-            return []
-
-        users = [lst.owner]
-        shared = (
-            User.select()
-            .join(SharedAccess)
-            .where((SharedAccess.task_list == list_id) & (SharedAccess.status == "ACCEPTED"))
-        )
-        users.extend(list(shared))
-        return users
 
     @staticmethod
     def delete_all_lists(user_id: int) -> int:
@@ -585,7 +591,9 @@ class TaskManager:
 
             target_list.title = new_name
             target_list.save()
-            logger.info(f"List RENAMED: ID={list_id} NewName='{new_name}' by User={user_id}")
+            logger.info(
+                f"List RENAMED: ID={list_id} NewName='{new_name}' by User={user_id}"
+            )
             return True
         except Exception as e:
             logger.error(f"Error renaming list: {e}")
@@ -597,22 +605,21 @@ class TaskManager:
             SharedAccess.select(SharedAccess, TaskList, User)
             .join(TaskList, on=(SharedAccess.task_list == TaskList.id))
             .join(User, on=(TaskList.owner == User.telegram_id))
-            .where(
-                (SharedAccess.user == user_id)
-                & (SharedAccess.status == "PENDING")
-            )
+            .where((SharedAccess.user == user_id) & (SharedAccess.status == "PENDING"))
         )
 
         results = []
         for access in query:
             tlist = access.task_list
             owner = tlist.owner
-            results.append({
-                "list_id": tlist.id,
-                "list_name": tlist.title,
-                "owner_name": owner.username or owner.first_name or "Unknown",
-                "invited_at": str(access.id)
-            })
+            results.append(
+                {
+                    "list_id": tlist.id,
+                    "list_name": tlist.title,
+                    "owner_name": owner.username or owner.first_name or "Unknown",
+                    "invited_at": str(access.id),
+                }
+            )
         return results
 
     @staticmethod

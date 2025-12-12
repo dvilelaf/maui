@@ -1,5 +1,4 @@
 import logging
-import json
 import tempfile
 import os
 from typing import Union
@@ -8,6 +7,7 @@ from src.services.llm_provider import LLMProvider
 from src.utils.schema import TaskExtractionResponse, UserIntent
 from src.utils.config import Config
 from datetime import datetime, timedelta
+
 
 class GroqProvider(LLMProvider):
     def __init__(self, api_key: str):
@@ -66,7 +66,6 @@ class GroqProvider(LLMProvider):
     def process_input(
         self, user_input: Union[str, bytes], mime_type: str = "text/plain"
     ) -> TaskExtractionResponse:
-
         text_input = user_input
 
         # 1. Transcribe if Audio
@@ -79,18 +78,18 @@ class GroqProvider(LLMProvider):
                 return TaskExtractionResponse(
                     is_relevant=False,
                     intent=UserIntent.UNKNOWN,
-                    reasoning=f"Error transcribing audio: {str(e)}"
+                    reasoning=f"Error transcribing audio: {str(e)}",
                 )
 
         # 2. Reason (Chat Completion)
         try:
-           return self._process_text(text_input)
+            return self._process_text(text_input)
         except Exception as e:
             self.logger.error(f"Groq Chat Completion failed: {e}")
             return TaskExtractionResponse(
                 is_relevant=False,
                 intent=UserIntent.UNKNOWN,
-                reasoning=f"Error processing text: {str(e)}"
+                reasoning=f"Error processing text: {str(e)}",
             )
 
     def _transcribe_audio(self, audio_bytes: bytes) -> str:
@@ -105,7 +104,7 @@ class GroqProvider(LLMProvider):
                 transcription = self.client.audio.transcriptions.create(
                     file=(tmp_path, file.read()),
                     model=self.transcription_model,
-                    response_format="json" # or verbose_json, text
+                    response_format="json",  # or verbose_json, text
                 )
             return transcription.text
         finally:
@@ -129,11 +128,11 @@ class GroqProvider(LLMProvider):
         completion = self.client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_instruction},
-                {"role": "user", "content": text}
+                {"role": "user", "content": text},
             ],
             model=self.chat_model,
             response_format={"type": "json_object"},
-            temperature=0.1
+            temperature=0.1,
         )
 
         response_content = completion.choices[0].message.content

@@ -4,6 +4,7 @@ from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 
+
 async def notify_user(user_id: int, message: str):
     """Sends a notification to the user."""
     try:

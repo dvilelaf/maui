@@ -2,10 +2,7 @@ from telegram.ext import ContextTypes
 import logging
 from src.database.repositories.task_repository import TaskManager
 from src.database.models import Task, User
-from src.utils.schema import TimeFilter
-from telegram import Bot
 from datetime import datetime, timedelta
-import logging
 
 logger = logging.getLogger(__name__)
 task_manager = TaskManager()

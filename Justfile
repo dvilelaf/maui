@@ -2,7 +2,7 @@ set dotenv-load
 
 # Build the Docker image
 build:
-    docker compose build
+    docker build -t dvilela/maui:latest .
 
 # Start the Docker container
 up:

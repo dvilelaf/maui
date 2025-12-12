@@ -6,10 +6,12 @@ from src.utils.schema import TaskStatus, TaskSchema
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
+
 # Models
 class TaskCreate(BaseModel):
     content: str
     list_id: Optional[int] = None
+
 
 class TaskUpdate(BaseModel):
     content: Optional[str] = None
@@ -17,12 +19,14 @@ class TaskUpdate(BaseModel):
     deadline: Optional[str] = None
     user_id: int
 
+
 class TaskResponse(BaseModel):
     id: int
     content: str
     status: str
     list_id: Optional[int]
     deadline: Optional[str]
+
 
 # Endpoints
 @router.get("/{user_id}", response_model=List[TaskResponse])
@@ -35,10 +39,11 @@ async def get_tasks(user_id: int):
             content=t.title,
             status=t.status,
             list_id=t.task_list.id if t.task_list else None,
-            deadline=str(t.deadline) if t.deadline else None
+            deadline=str(t.deadline) if t.deadline else None,
         )
         for t in tasks
     ]
+
 
 @router.post("/{user_id}/add", response_model=TaskResponse)
 async def add_task(user_id: int, task: TaskCreate):
@@ -48,13 +53,10 @@ async def add_task(user_id: int, task: TaskCreate):
         description="",
         priority="MEDIUM",
         deadline=None,
-        list_name=None
+        list_name=None,
     )
 
-    new_task = coordinator.task_manager.add_task(
-        user_id=user_id,
-        task_data=schema
-    )
+    new_task = coordinator.task_manager.add_task(user_id=user_id, task_data=schema)
 
     if new_task and task.list_id:
         new_task.task_list = task.list_id
@@ -68,30 +70,44 @@ async def add_task(user_id: int, task: TaskCreate):
         content=new_task.title,
         status=new_task.status,
         list_id=new_task.task_list.id if new_task.task_list else None,
-        deadline=str(new_task.deadline) if new_task.deadline else None
+        deadline=str(new_task.deadline) if new_task.deadline else None,
     )
+
 
 @router.post("/{task_id}/complete")
 async def complete_task(task_id: int, user_id: int = Body(..., embed=True)):
     # This works fine as a single body param
-    success = coordinator.task_manager.update_task_status(user_id, task_id, TaskStatus.COMPLETED)
+    success = coordinator.task_manager.update_task_status(
+        user_id, task_id, TaskStatus.COMPLETED
+    )
     if not success:
-         raise HTTPException(status_code=404, detail="Task not found or permission denied")
+        raise HTTPException(
+            status_code=404, detail="Task not found or permission denied"
+        )
     return {"status": "success"}
+
 
 @router.post("/{task_id}/uncomplete")
 async def uncomplete_task(task_id: int, user_id: int = Body(..., embed=True)):
-    success = coordinator.task_manager.update_task_status(user_id, task_id, TaskStatus.PENDING)
+    success = coordinator.task_manager.update_task_status(
+        user_id, task_id, TaskStatus.PENDING
+    )
     if not success:
-         raise HTTPException(status_code=404, detail="Task not found or permission denied")
+        raise HTTPException(
+            status_code=404, detail="Task not found or permission denied"
+        )
     return {"status": "success"}
+
 
 @router.post("/{task_id}/delete")
 async def delete_task(task_id: int, user_id: int = Body(..., embed=True)):
     success = coordinator.task_manager.delete_task(user_id, task_id)
     if not success:
-         raise HTTPException(status_code=404, detail="Task not found or permission denied")
+        raise HTTPException(
+            status_code=404, detail="Task not found or permission denied"
+        )
     return {"status": "success"}
+
 
 @router.post("/{task_id}/update")
 async def update_task_content(task_id: int, update: TaskUpdate):
@@ -100,6 +116,9 @@ async def update_task_content(task_id: int, update: TaskUpdate):
         schema = TaskSchema(title=update.content)
         success = coordinator.task_manager.edit_task(update.user_id, task_id, schema)
         if not success:
-            raise HTTPException(status_code=404, detail="Task not found, permission denied, or no changes")
+            raise HTTPException(
+                status_code=404,
+                detail="Task not found, permission denied, or no changes",
+            )
 
     return {"status": "success"}

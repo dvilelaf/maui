@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Body
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel
 from src.webapp.state import coordinator
 from src.webapp.routers.tasks import TaskResponse
 
 router = APIRouter(prefix="/api/lists", tags=["lists"])
+
 
 # Models
 class ListResponse(BaseModel):
@@ -14,12 +15,15 @@ class ListResponse(BaseModel):
     task_count: int
     tasks: List[TaskResponse] = []
 
+
 class ListCreate(BaseModel):
     name: str
+
 
 class ShareRequest(BaseModel):
     username: str
     user_id: int
+
 
 # Endpoints
 @router.get("/{user_id}", response_model=List[ListResponse])
@@ -35,52 +39,67 @@ async def get_lists(user_id: int):
                 content=t.title,
                 status=t.status,
                 list_id=t.task_list.id if t.task_list else None,
-                deadline=str(t.deadline) if t.deadline else None
-            ) for t in tasks_in_list
+                deadline=str(t.deadline) if t.deadline else None,
+            )
+            for t in tasks_in_list
         ]
-        result.append(ListResponse(
-            id=lst.id,
-            name=lst.title,
-            owner_id=lst.owner_id,
-            task_count=len(tasks_in_list),
-            tasks=task_responses
-        ))
+        result.append(
+            ListResponse(
+                id=lst.id,
+                name=lst.title,
+                owner_id=lst.owner_id,
+                task_count=len(tasks_in_list),
+                tasks=task_responses,
+            )
+        )
     return result
+
 
 @router.post("/{user_id}/add", response_model=ListResponse)
 async def create_list(user_id: int, lst: ListCreate):
     new_list = coordinator.task_manager.create_list(user_id, lst.name)
-    return ListResponse(id=new_list.id, name=new_list.title, owner_id=user_id, task_count=0, tasks=[])
+    return ListResponse(
+        id=new_list.id, name=new_list.title, owner_id=user_id, task_count=0, tasks=[]
+    )
+
 
 @router.post("/{list_id}/delete")
 async def delete_list(list_id: int, user_id: int = Body(..., embed=True)):
     success = coordinator.task_manager.delete_list(user_id, list_id)
     if not success:
-         raise HTTPException(status_code=403, detail="Failed to delete list")
+        raise HTTPException(status_code=403, detail="Failed to delete list")
     return {"status": "success"}
+
 
 @router.post("/{list_id}/leave")
 async def leave_list(list_id: int, user_id: int = Body(..., embed=True)):
     success, msg = await coordinator.task_manager.leave_list(user_id, list_id)
     if not success:
-         raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
     return {"status": "success", "message": msg}
+
 
 class ListUpdate(BaseModel):
     name: str
     user_id: int
+
 
 # Endpoints
 @router.post("/{list_id}/update")
 async def update_list(list_id: int, update: ListUpdate):
     success = coordinator.task_manager.edit_list(update.user_id, list_id, update.name)
     if not success:
-         raise HTTPException(status_code=403, detail="Failed to rename list or permission denied")
+        raise HTTPException(
+            status_code=403, detail="Failed to rename list or permission denied"
+        )
     return {"status": "success"}
+
 
 @router.post("/{list_id}/share")
 async def share_list(list_id: int, body: ShareRequest):
-    success, msg = await coordinator.task_manager.share_list(body.user_id, list_id, body.username)
+    success, msg = await coordinator.task_manager.share_list(
+        body.user_id, list_id, body.username
+    )
     if not success:
-         raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
     return {"status": "success", "message": msg}

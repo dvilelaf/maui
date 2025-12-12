@@ -6,6 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def resolve_user(target: str):
     """Resolve a target string (ID or @username) to a User object."""
     if target.isdigit():

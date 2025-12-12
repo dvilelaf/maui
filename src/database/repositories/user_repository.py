@@ -3,6 +3,7 @@ from src.database.models import User
 
 logger = logging.getLogger(__name__)
 
+
 class UserManager:
     @staticmethod
     def get_or_create_user(
@@ -45,9 +46,12 @@ class UserManager:
         from src.utils.config import Config
         from src.database.models import UserStatus
 
-        if telegram_id in Config.WHITELISTED_USERS and user.status != UserStatus.WHITELISTED:
-             user.status = UserStatus.WHITELISTED
-             user.save()
-             logger.info(f"User AUTO-WHITELISTED (Config): ID={telegram_id}")
+        if (
+            telegram_id in Config.WHITELISTED_USERS
+            and user.status != UserStatus.WHITELISTED
+        ):
+            user.status = UserStatus.WHITELISTED
+            user.save()
+            logger.info(f"User AUTO-WHITELISTED (Config): ID={telegram_id}")
 
         return user

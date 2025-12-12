@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,12 +6,12 @@ from contextlib import asynccontextmanager
 
 from src.utils.config import Config
 from src.database.core import db, init_db
-from src.webapp.state import coordinator
 from src.webapp.routers import tasks, lists, invites
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +28,7 @@ async def lifespan(app: FastAPI):
     logger.info("Closing Database...")
     if not db.is_closed():
         db.close()
+
 
 app = FastAPI(title="Maui Web App", lifespan=lifespan)
 

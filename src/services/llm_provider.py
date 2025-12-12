@@ -3,6 +3,7 @@ from typing import Union
 from src.utils.schema import TaskExtractionResponse
 from src.utils.config import Config
 
+
 class LLMProvider(ABC):
     @abstractmethod
     def process_input(
@@ -13,6 +14,7 @@ class LLMProvider(ABC):
         """
         pass
 
+
 class LLMFactory:
     @staticmethod
     def get_provider() -> LLMProvider:
@@ -20,12 +22,14 @@ class LLMFactory:
 
         if provider == "groq":
             from src.services.groq_provider import GroqProvider
+
             if not Config.GROQ_API_KEY:
                 raise ValueError("GROQ_API_KEY is not set but LLM_PROVIDER is 'groq'")
             return GroqProvider(Config.GROQ_API_KEY)
 
         elif provider == "gemini":
             from src.services.gemini import GeminiService
+
             return GeminiService(Config.GEMINI_API_KEYS)
 
         else:

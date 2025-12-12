@@ -1,7 +1,14 @@
-from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram import (
+    Update,
+    WebAppInfo,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 from telegram.ext import ContextTypes
 from src.services.coordinator import Coordinator
-from src.utils.schema import TaskStatus, UserStatus
+from src.utils.schema import UserStatus
 from src.utils.config import Config
 import logging
 
@@ -9,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize coordinator
 _coordinator = None
+
 
 def get_coordinator():
     global _coordinator
@@ -37,7 +45,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Create Web App Button
     kb = [
-        [KeyboardButton("Abrir App de Tareas 🌴", web_app=WebAppInfo(url=Config.WEBAPP_URL))]
+        [
+            KeyboardButton(
+                "Abrir App de Tareas 🌴", web_app=WebAppInfo(url=Config.WEBAPP_URL)
+            )
+        ]
     ]
     reply_markup = ReplyKeyboardMarkup(kb, resize_keyboard=True)
 
@@ -45,16 +57,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"¡Hola {user.mention_html()}! Soy Maui, tu asistente de tareas inteligente. 🌴\n"
         f"Para gestionar tus tareas y listas, por favor utiliza la <b>Mini App</b> pulsando el botón de abajo.\n\n"
         f"También puedes enviarme mensajes de voz o texto y yo los procesaré.",
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
     )
 
 
 async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send button to launch the Web App."""
-    kb = [[InlineKeyboardButton("Abrir App 🚀", web_app=WebAppInfo(url=Config.WEBAPP_URL))]]
+    kb = [
+        [
+            InlineKeyboardButton(
+                "Abrir App 🚀", web_app=WebAppInfo(url=Config.WEBAPP_URL)
+            )
+        ]
+    ]
     await update.message.reply_text(
         "Haz clic abajo para abrir la aplicación web:",
-        reply_markup=InlineKeyboardMarkup(kb)
+        reply_markup=InlineKeyboardMarkup(kb),
     )
 
 

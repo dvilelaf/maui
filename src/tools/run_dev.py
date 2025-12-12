@@ -1,8 +1,8 @@
-
 import subprocess
 import signal
 import sys
 import time
+
 
 def run_dev():
     """
@@ -14,17 +14,27 @@ def run_dev():
     # Start FastAPI Web App
     print("🌐 Launching Web App (Uvicorn)...")
     webapp_process = subprocess.Popen(
-        ["uv", "run", "python", "-m", "uvicorn", "src.webapp.app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+        [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "uvicorn",
+            "src.webapp.app:app",
+            "--reload",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+        ],
         stdout=sys.stdout,
-        stderr=sys.stderr
+        stderr=sys.stderr,
     )
 
     # Start Telegram Bot
     print("jq Launching Telegram Bot...")
     bot_process = subprocess.Popen(
-        ["uv", "run", "python", "src/main.py"],
-        stdout=sys.stdout,
-        stderr=sys.stderr
+        ["uv", "run", "python", "src/main.py"], stdout=sys.stdout, stderr=sys.stderr
     )
 
     shutdown = False
@@ -77,6 +87,7 @@ def run_dev():
             bot_process.kill()
 
         print("Done.")
+
 
 if __name__ == "__main__":
     run_dev()

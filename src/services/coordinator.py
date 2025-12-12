@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 from src.services.llm_provider import LLMFactory
 from src.database.repositories.task_repository import TaskManager
 from src.database.repositories.user_repository import UserManager
-from src.utils.config import Config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,9 +69,9 @@ class Coordinator:
         if extraction.intent == UserIntent.CREATE_LIST:
             list_name = "Nueva Lista"
             if extraction.formatted_task and extraction.formatted_task.title:
-                 list_name = extraction.formatted_task.title
+                list_name = extraction.formatted_task.title
             elif extraction.target_search_term:
-                 list_name = extraction.target_search_term
+                list_name = extraction.target_search_term
             new_list = self.task_manager.create_list(user_id, list_name)
             return f"📋 Lista creada: *{new_list.title}*"
 
@@ -93,7 +92,9 @@ class Coordinator:
 
             results = []
             for username in extraction.formatted_task.shared_with:
-                success, msg = await self.task_manager.share_list(user_id, target_list.id, username)
+                success, msg = await self.task_manager.share_list(
+                    user_id, target_list.id, username
+                )
                 emoji = "✅" if success else "⚠️"
                 results.append(f"{emoji} {msg}")
 
@@ -145,31 +146,38 @@ class Coordinator:
 
         # Handle List Response Intents
         if extraction.intent in (UserIntent.JOIN_LIST, UserIntent.REJECT_LIST):
-            if not extraction.target_search_term or not extraction.target_search_term.isdigit():
+            if (
+                not extraction.target_search_term
+                or not extraction.target_search_term.isdigit()
+            ):
                 return "⚠️ Necesito el ID de la lista (número) para unirme o rechazar. Ej: `/join 12`"
 
             list_id = int(extraction.target_search_term)
             accept = extraction.intent == UserIntent.JOIN_LIST
-            success, msg = await self.task_manager.respond_to_invite(user_id, list_id, accept)
+            success, msg = await self.task_manager.respond_to_invite(
+                user_id, list_id, accept
+            )
             return ("✅ " if success else "❌ ") + msg
 
         if extraction.intent == UserIntent.LEAVE_LIST:
             # Can be by ID or Name
             term = extraction.target_search_term
             if not term:
-                return "⚠️ Dime qué lista quieres dejar. Ej: `/leave Compra` o `/leave 12`"
+                return (
+                    "⚠️ Dime qué lista quieres dejar. Ej: `/leave Compra` o `/leave 12`"
+                )
 
             if term.isdigit():
-                 list_id = int(term)
-                 success, msg = await self.task_manager.leave_list(user_id, list_id)
-                 return ("✅ " if success else "❌ ") + msg
+                list_id = int(term)
+                success, msg = await self.task_manager.leave_list(user_id, list_id)
+                return ("✅ " if success else "❌ ") + msg
             else:
-                 # Search by name
-                 tlist = self.task_manager.find_list_by_name(user_id, term)
-                 if not tlist:
-                     return f"❌ No encontré la lista '{term}'."
-                 success, msg = await self.task_manager.leave_list(user_id, tlist.id)
-                 return ("✅ " if success else "❌ ") + msg
+                # Search by name
+                tlist = self.task_manager.find_list_by_name(user_id, term)
+                if not tlist:
+                    return f"❌ No encontré la lista '{term}'."
+                success, msg = await self.task_manager.leave_list(user_id, tlist.id)
+                return ("✅ " if success else "❌ ") + msg
 
         if extraction.intent == UserIntent.DELETE_LIST:
             term = extraction.target_search_term
@@ -177,11 +185,11 @@ class Coordinator:
                 return "⚠️ Dime qué lista quieres eliminar. Ej: 'Eliminar lista Compra'"
 
             if term == "ALL" or term == "todas":
-                 count = self.task_manager.delete_all_lists(user_id)
-                 if count > 0:
-                     return f"🗑️ Se han eliminado {count} listas."
-                 else:
-                     return "No tienes listas para eliminar."
+                count = self.task_manager.delete_all_lists(user_id)
+                if count > 0:
+                    return f"🗑️ Se han eliminado {count} listas."
+                else:
+                    return "No tienes listas para eliminar."
 
             tlist = self.task_manager.find_list_by_name(user_id, term)
             if not tlist:
@@ -191,7 +199,9 @@ class Coordinator:
             if success:
                 return f"🗑️ Lista eliminada: *{tlist.title}*"
             else:
-                return "❌ No se pudo eliminar la lista. Asegúrate de ser el propietario."
+                return (
+                    "❌ No se pudo eliminar la lista. Asegúrate de ser el propietario."
+                )
 
         # Handle Task Modification Intents
         if extraction.intent in (
