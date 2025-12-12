@@ -17,22 +17,23 @@ USER_ID = 599142
 TASK_ID = 1
 LIST_ID = 10
 
+from src.webapp.state import coordinator as real_coordinator
+
 @pytest.fixture
 def client(mock_coordinator):
-    # We mock the coordinator in handlers/app via the fixture in conftest?
-    # Actually app.py imports coordinator at module level: `coordinator = Coordinator()`
-    # We need to patch `src.webapp.app.coordinator`
-    with mock.patch("src.webapp.app.coordinator", mock_coordinator):
-        with TestClient(app) as c:
-            yield c
+    # Patch the attributes of the singleton instance to verify calls
+    with mock.patch.object(real_coordinator, 'task_manager', mock_coordinator.task_manager):
+             with TestClient(app) as c:
+                 yield c
 
 @pytest.fixture
 def mock_coordinator():
-    coord = mock.Mock()
-    # Mock TaskManager
+    # We return a simple object holding the mocks we want to inject
+    # The fixture above will apply them to real_coordinator
+    holder = mock.Mock()
     tm = mock.Mock()
-    coord.task_manager = tm
-    return coord
+    holder.task_manager = tm
+    return holder
 
 def test_get_tasks_all_statuses(client, mock_coordinator):
     # Mock return of get_user_tasks instead of get_pending_tasks
@@ -87,16 +88,17 @@ def test_add_task_persists(client, mock_coordinator):
     assert call_args.kwargs["task_data"].title == "New Persisted Task"
 
 def test_delete_task_updates_db(client, mock_coordinator):
-    mock_coordinator.task_manager.update_task_status.return_value = True
+    mock_coordinator.task_manager.delete_task.return_value = True
     response = client.post(f"/api/tasks/{TASK_ID}/delete")
     assert response.status_code == 200
 
-    mock_coordinator.task_manager.update_task_status.assert_called_with(TASK_ID, "CANCELLED")
+    mock_coordinator.task_manager.delete_task.assert_called_with(TASK_ID)
 
 def test_get_lists_with_nested_tasks(client, mock_coordinator):
     l1 = mock.Mock()
     l1.id = 10
     l1.title = "Groceries"
+    l1.owner_id = USER_ID # Fix: Add owner_id
 
     # Mock get_lists returning the list
     mock_coordinator.task_manager.get_lists.return_value = [l1]

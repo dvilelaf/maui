@@ -1,7 +1,6 @@
-
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from src.bot.handlers import start_command, help_command, get_tasks_command, add_task_command, get_lists_command
+from src.bot.handlers import start_command, help_command, webapp_command, handle_message, handle_voice
 from src.services.coordinator import Coordinator
 from src.database.models import User
 from src.utils.schema import TaskStatus, UserStatus
@@ -37,10 +36,6 @@ async def test_start_command(mock_update, mock_context, test_db, mocker):
     # No, handlers.py imports 'coordinator' instance from main? Or instantiates it?
     # Let's check handlers.py structure. It likely imports a global or is composed.
 
-    # handlers.py imports:
-    # from src.services.coordinator import coordinator  <-- usually singleton if defined there
-    # OR it gets passed.
-
     # Wait, usually handlers are just functions.
     # I need to see how `coordinator` is accessed in handlers.py.
     # Assuming it's imported globally or I need to patch it.
@@ -63,52 +58,21 @@ async def test_start_command(mock_update, mock_context, test_db, mocker):
     mock_update.message.reply_html.assert_called_once()
     args = mock_update.message.reply_html.call_args[0]
     assert "Hola" in args[0]
-
-@pytest.mark.asyncio
-async def test_get_tasks_command(mock_update, mock_context, test_db, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    mock_coord.get_task_summary.return_value = "No pending tasks"
-
-    await get_tasks_command(mock_update, mock_context)
-
-    mock_coord.get_task_summary.assert_called_with(12345)
-    mock_update.message.reply_text.assert_called_with("No pending tasks", parse_mode="Markdown")
-
-@pytest.mark.asyncio
-async def test_add_task_command_no_args(mock_update, mock_context):
-    mock_context.args = []
-    await add_task_command(mock_update, mock_context)
-    # Check "Uso: /add" presence
-    call_args = mock_update.message.reply_text.call_args[0][0]
-    assert "Uso: /add" in call_args
-
-@pytest.mark.asyncio
-async def test_add_task_command_success(mock_update, mock_context, mocker):
-    mock_context.args = ["Buy", "Milk"]
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    # mock handle_message return
-    mock_coord.handle_message = AsyncMock(return_value="Task Added")
-
-    await add_task_command(mock_update, mock_context)
-
-    mock_coord.handle_message.assert_called()
-    mock_update.message.reply_markdown.assert_called_with("Task Added")
-
-@pytest.mark.asyncio
-async def test_get_lists_command(mock_update, mock_context, mocker):
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    mock_coord.get_lists_summary.return_value = "Lists Summary"
-
-    await get_lists_command(mock_update, mock_context)
-
-    mock_coord.get_lists_summary.assert_called_with(12345)
-    mock_update.message.reply_text.assert_called_with("Lists Summary", parse_mode="Markdown")
+    # Should point to Mini App
+    assert "Mini App" in args[0]
 
 @pytest.mark.asyncio
 async def test_help_command(mock_update, mock_context):
     await help_command(mock_update, mock_context)
     mock_update.message.reply_text.assert_called_once()
-    assert "ayudarte" in mock_update.message.reply_text.call_args[0][0]
+    # Updated help message mentions Mini App
+    assert "Mini App" in mock_update.message.reply_text.call_args[0][0]
+
+@pytest.mark.asyncio
+async def test_webapp_command(mock_update, mock_context):
+    await webapp_command(mock_update, mock_context)
+    mock_update.message.reply_text.assert_called_once()
+    assert "aplicación web" in mock_update.message.reply_text.call_args[0][0]
 
 @pytest.mark.asyncio
 async def test_handle_message_text(mock_update, mock_context, mocker):
@@ -161,48 +125,6 @@ async def test_handle_voice_no_voice(mock_update, mock_context):
     mock_update.message.reply_markdown.assert_not_called()
 
 @pytest.mark.asyncio
-async def test_complete_task_command_success(mock_update, mock_context, mocker):
-    mock_context.args = ["1"]
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    mock_coord.task_manager.update_task_status.return_value = True
-
-    from src.bot.handlers import complete_task_command
-    await complete_task_command(mock_update, mock_context)
-
-    mock_coord.task_manager.update_task_status.assert_called_with(1, TaskStatus.COMPLETED)
-    assert "completada" in mock_update.message.reply_text.call_args[0][0]
-
-@pytest.mark.asyncio
-async def test_complete_task_command_fail(mock_update, mock_context, mocker):
-    mock_context.args = ["99"]
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    mock_coord.task_manager.update_task_status.return_value = False
-
-    from src.bot.handlers import complete_task_command
-    await complete_task_command(mock_update, mock_context)
-    assert "no encontrada" in mock_update.message.reply_text.call_args[0][0]
-
-@pytest.mark.asyncio
-async def test_complete_task_command_invalid(mock_update, mock_context):
-    mock_context.args = ["abc"]
-    from src.bot.handlers import complete_task_command
-    await complete_task_command(mock_update, mock_context)
-    assert "Uso:" in mock_update.message.reply_text.call_args[0][0]
-
-
-@pytest.mark.asyncio
-async def test_cancel_task_command_success(mock_update, mock_context, mocker):
-    mock_context.args = ["1"]
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    mock_coord.task_manager.update_task_status.return_value = True
-
-    from src.bot.handlers import cancel_task_command
-    await cancel_task_command(mock_update, mock_context)
-
-    mock_coord.task_manager.update_task_status.assert_called_with(1, "CANCELLED")
-    assert "cancelada" in mock_update.message.reply_text.call_args[0][0]
-
-@pytest.mark.asyncio
 async def test_handle_voice_error(mock_update, mock_context, mocker):
     mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
     # Simulate an error during processing
@@ -226,20 +148,6 @@ async def test_handle_voice_error(mock_update, mock_context, mocker):
     args = mock_update.message.reply_text.call_args
     # The actual message in handler is: "Lo siento, hubo un error al procesar tu audio. Por favor intenta de nuevo."
     assert "hubo un error al procesar tu audio" in args[0][0]
-
-@pytest.mark.asyncio
-async def test_cancel_task_command_invalid(mock_update, mock_context, mocker):
-    mock_context.args = ["invalid"]
-    mock_repo = mocker.patch("src.bot.handlers.get_coordinator").return_value.task_manager
-
-    from src.bot.handlers import cancel_task_command
-    await cancel_task_command(mock_update, mock_context)
-
-    # Check that it caught ValueError and sent usage help
-    # Usage message: "Uso: /cancel <id_tarea>"
-    assert mock_update.message.reply_text.call_count == 1
-    args = mock_update.message.reply_text.call_args
-    assert "Uso: /cancel" in args[0][0]
 
 @pytest.mark.asyncio
 async def test_start_command_pending_user(mock_update, mock_context, mocker):
@@ -269,16 +177,3 @@ async def test_start_command_blacklisted_user(mock_update, mock_context, mocker)
     # So strictly:
     mock_update.message.reply_html.assert_not_called()
     mock_update.message.reply_text.assert_not_called()
-
-@pytest.mark.asyncio
-async def test_cancel_task_command_fail(mock_update, mock_context, mocker):
-    mock_context.args = ["999"]
-    mock_coord = mocker.patch("src.bot.handlers.get_coordinator").return_value
-    # Return False -> Not found or failed
-    mock_coord.task_manager.update_task_status.return_value = False
-
-    from src.bot.handlers import cancel_task_command
-    await cancel_task_command(mock_update, mock_context)
-
-    mock_update.message.reply_text.assert_called_with("❌ Tarea no encontrada.")
-

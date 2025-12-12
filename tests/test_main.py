@@ -22,7 +22,7 @@ async def test_post_init():
 
     assert app_mock.bot.set_my_commands.called
     args = app_mock.bot.set_my_commands.call_args[0][0]
-    assert len(args) == 7
+    assert len(args) == 3
     assert args[0].command == "start"
 
 def test_main_success(mocker):
@@ -38,7 +38,8 @@ def test_main_success(mocker):
     main()
 
     # Verifications
-    assert app_mock.add_handler.call_count >= 8
+    # Handlers: start, help, app, handle_message, handle_voice = 5
+    assert app_mock.add_handler.call_count >= 5
     app_mock.run_polling.assert_called_once()
     assert app_mock.job_queue.run_daily.call_count == 2
     assert app_mock.job_queue.run_repeating.call_count == 1
