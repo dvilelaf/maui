@@ -4,3 +4,4 @@ __pycache__
 .git
 .pytest_cache
 maui.db
+tests/

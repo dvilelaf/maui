@@ -1,10 +1,9 @@
 services:
-  maui:
-    image: dvilela/maui
-    container_name: maui
+  maui-telegram:
+    image: dvilela/maui:latest
+    container_name: maui-telegram
     restart: unless-stopped
     volumes:
-      - ./src:/app/src # For development (hot reload not native but useful for inspection)
       - ./maui.db:/app/maui.db # Persist database
     environment:
       - PYTHONUNBUFFERED=1
@@ -13,3 +12,22 @@ services:
       - GEMINI_API_KEYS=${GEMINI_API_KEYS}
       - DATABASE_URL=${DATABASE_URL}
       - LOG_LEVEL=${LOG_LEVEL}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+
+  maui-webapp:
+    image: dvilela/maui:latest
+    container_name: maui-webapp
+    restart: unless-stopped
+    command: uv run uvicorn src.webapp.app:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./maui.db:/app/maui.db
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - DATABASE_URL=${DATABASE_URL}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - WEBAPP_URL=${WEBAPP_URL}
+    depends_on:
+      - maui-telegram
