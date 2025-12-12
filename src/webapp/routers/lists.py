@@ -66,8 +66,8 @@ async def leave_list(list_id: int, user_id: int = Body(..., embed=True)):
     return {"status": "success", "message": msg}
 
 @router.post("/{list_id}/share")
-async def share_list(list_id: int, body: ShareRequest):
-    success, msg = await coordinator.task_manager.share_list(list_id, body.username)
+async def share_list(list_id: int, body: ShareRequest, user_id: int = Body(..., embed=True)):
+    success, msg = await coordinator.task_manager.share_list(user_id, list_id, body.username)
     if not success:
          raise HTTPException(status_code=400, detail=msg)
     return {"status": "success", "message": msg}

@@ -78,13 +78,14 @@ async def test_tui_delete_edge_cases_mocked(test_db, mocker):
 
     # Fail User lookup
     # Mock active tab to specific
+    # Mock active tab to specific
     tab_mock.active = "users_tab"
-    with mocker.patch("src.database.models.User.get_by_id", side_effect=Exception("DB Fail")):
-         app.action_delete()
-         # Should pass exception and show confirm screen with fallback name "999"
-         app.push_screen.assert_called()
-         args = app.push_screen.call_args[0]
-         assert "999" in args[0].message
+    mocker.patch("src.database.models.User.get_by_id", side_effect=Exception("DB Fail"))
+    app.action_delete()
+    # Should pass exception and show confirm screen with fallback name "999"
+    app.push_screen.assert_called()
+    args = app.push_screen.call_args[0]
+    assert "999" in args[0].message
 
 @pytest.mark.asyncio
 async def test_tui_tab_wrapping(test_db, mocker):

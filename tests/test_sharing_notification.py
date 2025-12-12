@@ -27,7 +27,7 @@ async def test_share_list_notifies_user(test_db, mock_notify):
     # But since we are TDD-ish, we expect this to drive the change.
 
     # Executing call
-    success, msg = await TaskManager.share_list(tl.id, "target")
+    success, msg = await TaskManager.share_list(owner.telegram_id, tl.id, "target")
 
     assert success
     assert "Invitación enviada" in msg

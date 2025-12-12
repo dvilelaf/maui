@@ -89,10 +89,10 @@ def test_add_task_persists(client, mock_coordinator):
 
 def test_delete_task_updates_db(client, mock_coordinator):
     mock_coordinator.task_manager.delete_task.return_value = True
-    response = client.post(f"/api/tasks/{TASK_ID}/delete")
+    response = client.post(f"/api/tasks/{TASK_ID}/delete", json={"user_id": 123})  # Pass user_id
     assert response.status_code == 200
 
-    mock_coordinator.task_manager.delete_task.assert_called_with(TASK_ID)
+    mock_coordinator.task_manager.delete_task.assert_called_with(123, TASK_ID)
 
 def test_get_lists_with_nested_tasks(client, mock_coordinator):
     l1 = mock.Mock()

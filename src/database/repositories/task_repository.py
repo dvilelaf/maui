@@ -124,20 +124,54 @@ class TaskManager:
         return Task.get_or_none(Task.id == task_id)
 
     @staticmethod
-    def update_task_status(task_id: int, status: str) -> bool:
-        query = Task.update(status=status).where(Task.id == task_id)
-        return query.execute() > 0
+    def _check_task_access(user_id: int, task: Task) -> bool:
+        """Check if user has write access to the task."""
+        if task.user_id == user_id:
+            return True
+
+        # If in a list, check shared access
+        if task.task_list:
+            # Check owner
+            if task.task_list.owner_id == user_id:
+                return True
+            # Check if member
+            is_member = SharedAccess.select().where(
+                (SharedAccess.task_list == task.task_list) &
+                (SharedAccess.user == user_id) &
+                (SharedAccess.status == "ACCEPTED")
+            ).exists()
+            return is_member
+
+        return False
 
     @staticmethod
-    def delete_task(task_id: int) -> bool:
-        query = Task.delete().where(Task.id == task_id)
-        return query.execute() > 0
+    def update_task_status(user_id: int, task_id: int, status: str) -> bool:
+        task = Task.get_or_none(Task.id == task_id)
+        if not task:
+            return False
+
+        if not TaskManager._check_task_access(user_id, task):
+            return False
+
+        task.status = status
+        return task.save() > 0
+
+    @staticmethod
+    def delete_task(user_id: int, task_id: int) -> bool:
+        task = Task.get_or_none(Task.id == task_id)
+        if not task:
+            return False
+
+        if not TaskManager._check_task_access(user_id, task):
+            return False
+
+        return task.delete_instance() > 0
 
     @staticmethod
     def delete_all_pending_tasks(
         user_id: int, time_filter: TimeFilter = TimeFilter.ALL
     ) -> int:
-
+        # Only deletes OWNED tasks that are NOT in a list
         query = (
             (Task.user == user_id)
             & (Task.status == TaskStatus.PENDING)
@@ -165,7 +199,14 @@ class TaskManager:
         return Task.delete().where(query).execute()
 
     @staticmethod
-    def edit_task(task_id: int, update_data: TaskSchema) -> bool:
+    def edit_task(user_id: int, task_id: int, update_data: TaskSchema) -> bool:
+        task = Task.get_or_none(Task.id == task_id)
+        if not task:
+            return False
+
+        if not TaskManager._check_task_access(user_id, task):
+            return False
+
         updates = update_data.model_dump(exclude_unset=True)
         updates = {k: v for k, v in updates.items() if v is not None}
 
@@ -173,20 +214,41 @@ class TaskManager:
             return False
 
         allowed_fields = {"title", "description", "deadline", "priority", "status"}
-        updates = {k: v for k, v in updates.items() if k in allowed_fields}
 
-        return Task.update(**updates).where(Task.id == task_id).execute() > 0
+        for k, v in updates.items():
+            if k in allowed_fields:
+                setattr(task, k, v)
+
+        return task.save() > 0
 
     @staticmethod
     def find_tasks_by_keyword(
         user_id: int, keyword: str, list_id: int = None
     ) -> List[Task]:
-        query = (Task.user == user_id) & (Task.status == TaskStatus.PENDING)
+        # Secure search
+        query = (Task.status == TaskStatus.PENDING)
 
         if list_id:
-            query &= Task.task_list == list_id
+            # Check access to list
+            has_access = False
+            tlist = TaskList.get_or_none(TaskList.id == list_id)
+            if tlist:
+                if tlist.owner_id == user_id:
+                    has_access = True
+                else:
+                    has_access = SharedAccess.select().where(
+                        (SharedAccess.task_list == list_id) &
+                        (SharedAccess.user == user_id) &
+                        (SharedAccess.status == "ACCEPTED")
+                    ).exists()
+
+            if not has_access:
+                return []
+
+            query &= (Task.task_list == list_id)
         else:
-            query &= Task.task_list.is_null()
+            # Only personal tasks
+            query &= (Task.user == user_id) & (Task.task_list.is_null())
 
         query &= (Task.title.contains(keyword)) | (Task.description.contains(keyword))
         return list(Task.select().where(query))
@@ -196,7 +258,15 @@ class TaskManager:
         return TaskList.create(title=title, owner=user_id)
 
     @staticmethod
-    async def share_list(list_id: int, target_query: str) -> tuple[bool, str]:
+    async def share_list(user_id: int, list_id: int, target_query: str) -> tuple[bool, str]:
+        # Validate ownership
+        tlist = TaskList.get_or_none(TaskList.id == list_id)
+        if not tlist:
+            return False, "Lista no encontrada."
+
+        if tlist.owner_id != user_id:
+            return False, "No tienes permiso para compartir esta lista."
+
         query_str = target_query.strip().replace("@", "")
 
         target_user = User.get_or_none(User.username == query_str)
@@ -257,12 +327,11 @@ class TaskManager:
         )
 
         try:
-             list_obj = TaskList.get_by_id(list_id)
-             owner = list_obj.owner
+             owner = tlist.owner
              owner_name = owner.username or owner.first_name
              await notify_user(
                  target_user.telegram_id,
-                 f"📩 Has sido invitado por @{owner_name} a unirte a la lista '*{list_obj.title}*'.\n"
+                 f"📩 Has sido invitado por @{owner_name} a unirte a la lista '*{tlist.title}*'.\n"
                  f"Usa `/join {list_id}` para unirte o `/reject {list_id}` para rechazar."
              )
         except Exception as e:
@@ -337,6 +406,10 @@ class TaskManager:
             return True, f"Has salido de la lista '*{tlist.title}*'."
 
         except SharedAccess.DoesNotExist:
+            # Check if owner
+            tlist = TaskList.get_or_none(TaskList.id == list_id)
+            if tlist and tlist.owner_id == user_id:
+                 return False, "Como creador, no puedes salirte. Usa 'Borrar Lista'."
             return False, "No eres miembro de esta lista."
 
     @staticmethod

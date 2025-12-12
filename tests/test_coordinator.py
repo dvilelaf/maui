@@ -6,7 +6,7 @@ from src.services.coordinator import Coordinator
 from src.utils.schema import TaskSchema, TaskStatus, TimeFilter, UserIntent, TaskExtractionResponse, UserStatus
 from src.database.repositories.user_repository import UserManager
 from src.database.repositories.task_repository import TaskManager
-from src.database.models import User, Task
+from src.database.models import User, Task, TaskList
 from datetime import datetime, timedelta
 
 @pytest.fixture
@@ -122,18 +122,23 @@ async def test_handle_create_list(coordinator, user):
 
 @pytest.mark.asyncio
 async def test_handle_share_list(coordinator, user):
-    # Setup: Create list and another user to share with
-    tlist = TaskManager.create_list(user.telegram_id, "Work")
-    other_user = UserManager.get_or_create_user(67890, "colleague", "Colleague", "User")
+    # Setup
+    coordinator.task_manager.find_list_by_name = MagicMock(return_value=TaskList(id=1, title="Test List"))
+    coordinator.task_manager.share_list = AsyncMock(return_value=(True, "Invitación enviada"))
+    coordinator.user_manager.get_or_create_user = MagicMock(return_value=MagicMock(telegram_id=12345, status=UserStatus.WHITELISTED))
 
-    extraction = TaskExtractionResponse(
-        intent=UserIntent.SHARE_LIST,
+    # Mocks
+    coordinator.llm.process_input.return_value = TaskExtractionResponse(
         is_relevant=True,
-        target_search_term="Work",
-        formatted_task=TaskSchema(shared_with=["@colleague"])
+        intent=UserIntent.SHARE_LIST,
+        target_search_term="Test List",
+        formatted_task=TaskSchema(title="Test List", shared_with=["friend"])
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "share list Work with @colleague", extraction=extraction)
+    response = await coordinator.handle_message(12345, "user", "Compartir lista Test List con friend")
+
+    # Assert
+    coordinator.task_manager.share_list.assert_called_with(12345, 1, "friend")
     assert "✅" in response
 
     # Verify sharing

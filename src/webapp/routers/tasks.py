@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from typing import List, Optional
 from pydantic import BaseModel
 from src.webapp.state import coordinator
@@ -71,32 +71,32 @@ async def add_task(user_id: int, task: TaskCreate):
     )
 
 @router.post("/{task_id}/complete")
-async def complete_task(task_id: int):
-    success = coordinator.task_manager.update_task_status(task_id, TaskStatus.COMPLETED)
+async def complete_task(task_id: int, user_id: int = Body(..., embed=True)):
+    success = coordinator.task_manager.update_task_status(user_id, task_id, TaskStatus.COMPLETED)
     if not success:
-         raise HTTPException(status_code=404, detail="Task not found")
+         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     return {"status": "success"}
 
 @router.post("/{task_id}/uncomplete")
-async def uncomplete_task(task_id: int):
-    success = coordinator.task_manager.update_task_status(task_id, TaskStatus.PENDING)
+async def uncomplete_task(task_id: int, user_id: int = Body(..., embed=True)):
+    success = coordinator.task_manager.update_task_status(user_id, task_id, TaskStatus.PENDING)
     if not success:
-         raise HTTPException(status_code=404, detail="Task not found")
+         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     return {"status": "success"}
 
 @router.post("/{task_id}/delete")
-async def delete_task(task_id: int):
-    success = coordinator.task_manager.delete_task(task_id)
+async def delete_task(task_id: int, user_id: int = Body(..., embed=True)):
+    success = coordinator.task_manager.delete_task(user_id, task_id)
     if not success:
-         raise HTTPException(status_code=404, detail="Task not found")
+         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     return {"status": "success"}
 
 @router.post("/{task_id}/update")
-async def update_task_content(task_id: int, update: TaskUpdate):
+async def update_task_content(task_id: int, update: TaskUpdate, user_id: int = Body(..., embed=True)):
     if update.content:
         schema = TaskSchema(title=update.content)
-        success = coordinator.task_manager.edit_task(task_id, schema)
+        success = coordinator.task_manager.edit_task(user_id, task_id, schema)
         if not success:
-            raise HTTPException(status_code=404, detail="Task not found or no changes")
+            raise HTTPException(status_code=404, detail="Task not found, permission denied, or no changes")
 
     return {"status": "success"}

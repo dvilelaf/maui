@@ -93,7 +93,7 @@ class Coordinator:
 
             results = []
             for username in extraction.formatted_task.shared_with:
-                success, msg = await self.task_manager.share_list(target_list.id, username)
+                success, msg = await self.task_manager.share_list(user_id, target_list.id, username)
                 emoji = "✅" if success else "⚠️"
                 results.append(f"{emoji} {msg}")
 
@@ -232,12 +232,12 @@ class Coordinator:
             target_task = candidates[0]
 
             if extraction.intent == UserIntent.CANCEL_TASK:
-                self.task_manager.delete_task(target_task.id)
+                self.task_manager.delete_task(user_id, target_task.id)
                 return f"🗑️ Tarea eliminada: *{target_task.title}*"
 
             if extraction.intent == UserIntent.COMPLETE_TASK:
                 self.task_manager.update_task_status(
-                    target_task.id, TaskStatus.COMPLETED
+                    user_id, target_task.id, TaskStatus.COMPLETED
                 )
                 return f"✅ Tarea completada: *{target_task.title}*"
 
@@ -292,7 +292,7 @@ class Coordinator:
                         changes.append(f"📅 Fecha: {old_str} -> {new_str}")
 
                 success = self.task_manager.edit_task(
-                    target_task.id, extraction.formatted_task
+                    user_id, target_task.id, extraction.formatted_task
                 )
 
                 if success:

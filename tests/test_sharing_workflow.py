@@ -18,7 +18,7 @@ async def test_full_sharing_workflow(test_db, mocker):
     # 1. Invite Alice
     # ----------------
     tl = TaskManager.create_list(owner.telegram_id, "Party List")
-    success, msg = await TaskManager.share_list(tl.id, "Alice")
+    success, msg = await TaskManager.share_list(owner.telegram_id, tl.id, "Alice")
 
     assert success
     assert "Alice" in msg
@@ -55,7 +55,7 @@ async def test_full_sharing_workflow(test_db, mocker):
 
     # 3. Invite Bob and Bob Rejects
     # -----------------------------
-    await TaskManager.share_list(tl.id, "Bob")
+    await TaskManager.share_list(owner.telegram_id, tl.id, "Bob")
     access_bob = SharedAccess.get(SharedAccess.user == bob, SharedAccess.task_list == tl)
     assert access_bob.status == "PENDING"
 

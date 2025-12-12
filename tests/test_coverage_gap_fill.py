@@ -53,13 +53,14 @@ async def test_share_list_fuzzy_multi(test_db, mocker):
     User.create(telegram_id=1001, first_name="Alice", username="alice_u")
     User.create(telegram_id=1002, first_name="Alicia", username="alicia_u")
 
-    success, msg = await TaskManager.share_list(tl.id, "Ali")
+    # If fuzzy logic matches one high enough, it succeeds.
+    success, msg = await TaskManager.share_list(1000, tl.id, "Ali")
     if success:
         assert "Invitación enviada" in msg
     else:
         assert "Múltiples usuarios" in msg or "varios usuarios" in msg
 
-    success, msg = await TaskManager.share_list(tl.id, "Alice")
+    success, msg = await TaskManager.share_list(1000, tl.id, "Alice")
     assert success
     # Check for First Name OR Username
     assert "Alice" in msg or "alice_u" in msg
@@ -86,7 +87,7 @@ async def test_share_list_fuzzy_fail(test_db, mocker):
     mocker.patch("src.database.repositories.task_repository.notify_user", new_callable=AsyncMock)
 
     tl = TaskList.create(title="MyList", owner=User.create(telegram_id=1))
-    success, msg = await TaskManager.share_list(tl.id, "Nobody")
+    success, msg = await TaskManager.share_list(1, tl.id, "Nobody")
     assert not success
 
 @pytest.mark.asyncio
@@ -99,7 +100,7 @@ async def test_share_list_complex(test_db, mocker):
 
     u = User.create(telegram_id=3001, username="complex_user")
 
-    success, msg = await TaskManager.share_list(tl.id, "complex")
+    success, msg = await TaskManager.share_list(3000, tl.id, "complex")
     assert success
     assert "complex_user" in msg
 

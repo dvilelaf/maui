@@ -18,7 +18,7 @@ async def test_leave_list_success(test_db, mocker):
     tlist = TaskList.create(title="My List", owner=owner)
 
     # Search for non-existent user
-    success, msg = await TaskManager.share_list(tlist.id, "@ghostuser")
+    success, msg = await TaskManager.share_list(owner.telegram_id, tlist.id, "@ghostuser")
     assert success is False
     assert "no encontrado" in msg
 

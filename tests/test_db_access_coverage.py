@@ -86,12 +86,10 @@ def test_update_status_exception(test_db, mocker, capsys):
 
 @pytest.mark.asyncio
 async def test_share_list(test_db, mocker):
-    from src.database.repositories.task_repository import TaskManager
     mocker.patch("src.database.repositories.task_repository.notify_user", new_callable=AsyncMock)
+    u = UserManager.get_or_create_user(1, "u1")
+    l = TaskManager.create_list(1, "L1")
+    u2 = UserManager.get_or_create_user(2, "u2")
 
-    u1 = UserManager.get_or_create_user(100, "u1")
-    u2 = UserManager.get_or_create_user(101, "u2")
-    l = TaskManager.create_list(100, "Shared")
-
-    success, msg = await TaskManager.share_list(l.id, "u2")
+    success, msg = await TaskManager.share_list(1, l.id, "u2")
     assert success

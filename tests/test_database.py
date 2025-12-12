@@ -69,7 +69,7 @@ async def test_share_list(test_db, user, mock_notify):
     tlist = TaskManager.create_list(user.telegram_id, "Shared List")
 
     # Share exact match
-    success, msg = await TaskManager.share_list(tlist.id, "friend")
+    success, msg = await TaskManager.share_list(user.telegram_id, tlist.id, "friend")
     assert success
     assert "Invitación enviada" in msg
 
@@ -89,7 +89,7 @@ async def test_share_list_fuzzy(test_db, user, mock_notify):
     tlist = TaskManager.create_list(user.telegram_id, "Project")
 
     # Share by First Name
-    success, msg = await TaskManager.share_list(tlist.id, "David")
+    success, msg = await TaskManager.share_list(user.telegram_id, tlist.id, "David")
     assert success
     assert "David" in msg or "dave123" in msg
 
@@ -136,7 +136,7 @@ def test_update_status(test_db, user, mocker):
 
 def test_delete_task(test_db, user):
     t = TaskManager.add_task(user.telegram_id, TaskSchema(title="Delete Me"))
-    assert TaskManager.delete_task(t.id) is True
+    assert TaskManager.delete_task(user.telegram_id, t.id) is True
     assert Task.get_or_none(Task.id == t.id) is None
 
 def test_delete_all_pending_tasks(test_db, user):
@@ -152,12 +152,12 @@ def test_edit_task(test_db, user):
     t = TaskManager.add_task(user.telegram_id, TaskSchema(title="Old"))
 
     # Update title
-    TaskManager.edit_task(t.id, TaskSchema(title="New"))
+    TaskManager.edit_task(user.telegram_id, t.id, TaskSchema(title="New"))
     t_db = Task.get_by_id(t.id)
     assert t_db.title == "New"
 
     # Update status
-    TaskManager.edit_task(t.id, TaskSchema(status=TaskStatus.COMPLETED))
+    TaskManager.edit_task(user.telegram_id, t.id, TaskSchema(status=TaskStatus.COMPLETED))
     t_db = Task.get_by_id(t.id)
     assert t_db.status == TaskStatus.COMPLETED
 
@@ -250,22 +250,22 @@ async def test_share_list_edge_cases(test_db, mock_notify):
     l = TaskManager.create_list(800, "My List")
 
     # 1. Not found
-    success, msg = await TaskManager.share_list(l.id, "nobody")
+    success, msg = await TaskManager.share_list(800, l.id, "nobody")
     assert not success
     assert "no encontrado" in msg
 
     # 2. Multiple matches
     UserManager.get_or_create_user(801, "juan_perez")
     UserManager.get_or_create_user(802, "juan_lopez")
-    success, msg = await TaskManager.share_list(l.id, "juan")
+    success, msg = await TaskManager.share_list(800, l.id, "juan")
     assert not success
     assert "varios usuarios" in msg
 
     # 3. Already shared
     UserManager.get_or_create_user(803, "unique_friend")
-    await TaskManager.share_list(l.id, "unique_friend")
+    await TaskManager.share_list(800, l.id, "unique_friend")
     # Try again
-    success, msg = await TaskManager.share_list(l.id, "unique_friend")
+    success, msg = await TaskManager.share_list(800, l.id, "unique_friend")
     assert not success
     assert "ya está compartida" in msg
 
@@ -302,7 +302,7 @@ async def test_get_list_members(test_db, mock_notify):
 
     member = UserManager.get_or_create_user(601, "member")
     member = UserManager.get_or_create_user(601, "member")
-    await TaskManager.share_list(l.id, "member")
+    await TaskManager.share_list(600, l.id, "member")
     # Accept invite
     await TaskManager.respond_to_invite(601, l.id, True)
 
