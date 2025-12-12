@@ -132,7 +132,10 @@ async def test_share_list(test_db, mocker):
     # Share success
     success, msg = await TaskManager.share_list(tl.id, "other701")
     assert success
-    assert "compartida" in msg
+    assert "Invitación enviada" in msg
+
+    # Accept to check members
+    await TaskManager.respond_to_invite(other.telegram_id, tl.id, True)
 
     # Check members
     members = TaskManager.get_list_members(tl.id)

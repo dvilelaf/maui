@@ -142,6 +142,34 @@ class Coordinator:
 
             return f"✅ Tarea guardada: *{new_task.title}*{deadline_str}"
 
+        # Handle List Response Intents
+        if extraction.intent in (UserIntent.JOIN_LIST, UserIntent.REJECT_LIST):
+            if not extraction.target_search_term or not extraction.target_search_term.isdigit():
+                return "⚠️ Necesito el ID de la lista (número) para unirme o rechazar. Ej: `/join 12`"
+
+            list_id = int(extraction.target_search_term)
+            accept = extraction.intent == UserIntent.JOIN_LIST
+            success, msg = await self.task_manager.respond_to_invite(user_id, list_id, accept)
+            return ("✅ " if success else "❌ ") + msg
+
+        if extraction.intent == UserIntent.LEAVE_LIST:
+            # Can be by ID or Name
+            term = extraction.target_search_term
+            if not term:
+                return "⚠️ Dime qué lista quieres dejar. Ej: `/leave Compra` o `/leave 12`"
+
+            if term.isdigit():
+                 list_id = int(term)
+                 success, msg = await self.task_manager.leave_list(user_id, list_id)
+                 return ("✅ " if success else "❌ ") + msg
+            else:
+                 # Search by name
+                 tlist = self.task_manager.find_list_by_name(user_id, term)
+                 if not tlist:
+                     return f"❌ No encontré la lista '{term}'."
+                 success, msg = await self.task_manager.leave_list(user_id, tlist.id)
+                 return ("✅ " if success else "❌ ") + msg
+
         # Handle Task Modification Intents
         if extraction.intent in (
             UserIntent.CANCEL_TASK,

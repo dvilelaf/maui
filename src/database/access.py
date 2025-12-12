@@ -379,7 +379,7 @@ class TaskManager:
         SharedAccess.create(
             user=target_user,
             task_list=list_id,
-            status="ACCEPTED",  # Auto-accept for now to simplify, or PENDING if strict
+            status="PENDING",
         )
 
         # Notify the recipient
@@ -389,15 +389,96 @@ class TaskManager:
              owner_name = owner.username or owner.first_name
              await notify_user(
                  target_user.telegram_id,
-                 f"📋 ¡Hola! @{owner_name} ha compartido la lista '*{list_obj.title}*' contigo."
+                 f"📩 Has sido invitado por @{owner_name} a unirte a la lista '*{list_obj.title}*'.\n"
+                 f"Usa `/join {list_id}` para unirte o `/reject {list_id}` para rechazar."
              )
         except Exception as e:
             logger.error(f"Failed to notify user shared: {e}")
 
         return (
             True,
-            f"Lista compartida con @{target_user.username or target_user.first_name}.",
+            f"Invitación enviada a @{target_user.username or target_user.first_name}.",
         )
+
+    @staticmethod
+    async def respond_to_invite(user_id: int, list_id: int, accept: bool) -> tuple[bool, str]:
+        """
+        Accept or Reject a list invitation.
+        """
+        user = User.get_or_none(User.telegram_id == user_id)
+        if not user:
+            return False, "Usuario no encontrado."
+
+        try:
+            access = SharedAccess.get(
+                (SharedAccess.user == user) & (SharedAccess.task_list == list_id)
+            )
+        except SharedAccess.DoesNotExist:
+            return False, "No tienes una invitación pendiente para esta lista."
+
+        tlist = TaskList.get_by_id(list_id)
+        user_name = user.username or user.first_name
+
+        if accept:
+            access.status = "ACCEPTED"
+            access.save()
+
+            # Notify owner and members
+            members = TaskManager.get_list_members(list_id)
+            for m in members:
+                if m.telegram_id != user.telegram_id:
+                    await notify_user(
+                        m.telegram_id,
+                        f"👤 @{user_name} se ha unido a la lista '*{tlist.title}*'."
+                    )
+            return True, f"Te has unido a la lista '*{tlist.title}*'."
+        else:
+            access.delete_instance()
+            # Notify owner (and members? usually just owner needs to know rejection)
+            # "Todos los usuarios son notificados si esto pasa" -> rejection is less critical for members, but prompts says "Someone joins or rejects... members receive notification".
+            members = TaskManager.get_list_members(list_id)
+            for m in members:
+                 if m.telegram_id != user.telegram_id: # Usually just owner + accepted members
+                     await notify_user(
+                        m.telegram_id,
+                        f"👤 @{user_name} ha rechazado la invitación a '*{tlist.title}*'."
+                     )
+            return True, f"Has rechazado la invitación a '*{tlist.title}*'."
+
+    @staticmethod
+    async def leave_list(user_id: int, list_id: int) -> tuple[bool, str]:
+        """
+        Leave a shared list.
+        """
+        user = User.get_or_none(User.telegram_id == user_id)
+        if not user:
+            return False, "Usuario no encontrado."
+
+        try:
+            # Only delete if it exists
+            access = SharedAccess.get(
+                (SharedAccess.user == user) & (SharedAccess.task_list == list_id)
+            )
+            access.delete_instance()
+
+            tlist = TaskList.get_by_id(list_id)
+            user_name = user.username or user.first_name
+
+            tlist = TaskList.get_by_id(list_id)
+            user_name = user.username or user.first_name
+
+            # Notify owner and members
+            members = TaskManager.get_list_members(list_id)
+            for m in members:
+                if m.telegram_id != user.telegram_id:
+                    await notify_user(
+                        m.telegram_id,
+                        f"👋 @{user_name} ha salido de la lista '*{tlist.title}*'."
+                    )
+            return True, f"Has salido de la lista '*{tlist.title}*'."
+
+        except SharedAccess.DoesNotExist:
+            return False, "No eres miembro de esta lista."
 
     @staticmethod
     def get_list_members(list_id: int) -> List[User]:

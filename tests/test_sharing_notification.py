@@ -25,7 +25,7 @@ async def test_share_list_notifies_user(test_db, mocker):
     success, msg = await TaskManager.share_list(tl.id, "target")
 
     assert success
-    assert "compartida" in msg
+    assert "Invitación enviada" in msg
 
     # Verify notification
     mock_notify.assert_called_once()

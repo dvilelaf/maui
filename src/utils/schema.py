@@ -13,6 +13,9 @@ class UserIntent(str, Enum):
     EDIT_TASK = "EDIT_TASK"
     CREATE_LIST = "CREATE_LIST"
     SHARE_LIST = "SHARE_LIST"
+    JOIN_LIST = "JOIN_LIST"
+    REJECT_LIST = "REJECT_LIST"
+    LEAVE_LIST = "LEAVE_LIST"
     UNKNOWN = "UNKNOWN"
 
 

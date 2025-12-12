@@ -67,7 +67,10 @@ async def test_share_list(test_db, user, mocker):
     # Share exact match
     success, msg = await TaskManager.share_list(tlist.id, "friend")
     assert success
-    assert "compartida" in msg
+    assert "Invitación enviada" in msg
+
+    # Accept invite
+    await TaskManager.respond_to_invite(other.telegram_id, tlist.id, True)
 
     # Verify access
     shared_lists = TaskManager.get_lists(other.telegram_id)
@@ -305,8 +308,10 @@ async def test_get_list_members(test_db, mocker):
     l = TaskManager.create_list(600, "Membership List")
 
     member = UserManager.get_or_create_user(601, "member")
+    member = UserManager.get_or_create_user(601, "member")
     await TaskManager.share_list(l.id, "member")
-    # share_list auto-accepts in current impl
+    # Accept invite
+    await TaskManager.respond_to_invite(601, l.id, True)
 
     members = TaskManager.get_list_members(l.id)
     assert len(members) == 2
