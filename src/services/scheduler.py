@@ -78,6 +78,7 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
             & (Task.deadline > now)
             & (Task.deadline <= time_threshold)
             & (Task.reminder_sent == False)  # noqa: E712
+            & (Task.task_list.is_null())
         )
     )
 
