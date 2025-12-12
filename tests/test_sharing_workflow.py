@@ -1,18 +1,19 @@
 
 import pytest
-from unittest.mock import AsyncMock, patch
-from src.database.access import TaskManager
+from unittest.mock import AsyncMock
+from src.database.repositories.task_repository import TaskManager
+from src.database.repositories.user_repository import UserManager
 from src.database.models import User, TaskList, SharedAccess
 
 @pytest.mark.asyncio
 async def test_full_sharing_workflow(test_db, mocker):
-    # Setup mocks
-    mock_notify = mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
+    # Mock notify_user where it is USED
+    mock_notify = mocker.patch("src.database.repositories.task_repository.notify_user", new_callable=AsyncMock)
 
     # Setup Users
-    owner = User.create(telegram_id=100, username="Owner")
-    alice = User.create(telegram_id=101, username="Alice")
-    bob = User.create(telegram_id=102, username="Bob")
+    owner = UserManager.get_or_create_user(100, "Owner") # Changed to UserManager and kept original username
+    alice = UserManager.get_or_create_user(101, "Alice") # Changed to UserManager
+    bob = UserManager.get_or_create_user(102, "Bob") # Changed to UserManager
 
     # 1. Invite Alice
     # ----------------

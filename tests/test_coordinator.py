@@ -1,11 +1,12 @@
 
 import pytest
 import pytest_asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 from src.services.coordinator import Coordinator
 from src.utils.schema import TaskSchema, TaskStatus, TimeFilter, UserIntent, TaskExtractionResponse, UserStatus
+from src.database.repositories.user_repository import UserManager
+from src.database.repositories.task_repository import TaskManager
 from src.database.models import User, Task
-from src.database.access import TaskManager, UserManager
 from datetime import datetime, timedelta
 
 @pytest.fixture

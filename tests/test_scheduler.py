@@ -4,7 +4,8 @@ from unittest.mock import MagicMock, AsyncMock
 from datetime import datetime, timedelta
 from src.services.scheduler import send_weekly_summary, send_pending_alert, check_deadlines_job
 from src.database.models import User, Task
-from src.database.access import TaskManager, UserManager
+from src.database.repositories.task_repository import TaskManager
+from src.database.repositories.user_repository import UserManager
 from src.utils.schema import TaskSchema, TaskStatus
 
 @pytest.fixture

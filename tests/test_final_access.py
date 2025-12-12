@@ -1,11 +1,11 @@
-from src.database.access import TaskManager
 from src.database.models import User, Task, TaskList, SharedAccess
 import pytest
 from unittest.mock import AsyncMock
+from src.database.repositories.task_repository import TaskManager
 
 @pytest.mark.asyncio
-async def test_access_coverage_final(test_db, mocker):
-    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
+async def test_leave_list_success(test_db, mocker):
+    mocker.patch("src.services.notification_service.notify_user", new_callable=AsyncMock)
     # Line 229: get_or_none
     # We need to call get_or_none directly
     u = User.get_or_none(User.telegram_id == 99999)

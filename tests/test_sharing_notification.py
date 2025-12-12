@@ -1,19 +1,24 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.database.access import TaskManager
-from src.database.models import User, TaskList
+from src.database.repositories.task_repository import TaskManager
+from unittest.mock import AsyncMock
+from src.database.repositories.task_repository import TaskManager
+from src.database.repositories.user_repository import UserManager
+from src.database.models import TaskList, SharedAccess
+
+@pytest.fixture
+def mock_notify(mocker):
+    # Patch where it is USED in TaskManager
+    mock_notify = mocker.patch("src.database.repositories.task_repository.notify_user", new_callable=AsyncMock)
+    return mock_notify
 
 @pytest.mark.asyncio
-async def test_share_list_notifies_user(test_db, mocker):
+async def test_share_list_notifies_user(test_db, mock_notify):
     # Setup
-    owner = User.create(telegram_id=100, first_name="Owner", username="owner")
-    target = User.create(telegram_id=200, first_name="Target", username="target")
+    owner = UserManager.get_or_create_user(telegram_id=100, first_name="Owner", username="owner")
+    target = UserManager.get_or_create_user(telegram_id=200, first_name="Target", username="target")
     tl = TaskList.create(title="SharedStuff", owner=owner)
-
-    # Mock notify_user in access.py
-    # Since it is imported/defined at module level, we patch 'src.database.access.notify_user'
-    mock_notify = mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
 
     # Call share_list (which we expect to be async now)
     # Note: If code isn't updated yet, this test will fail as share_list is currently sync.

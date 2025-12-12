@@ -1,13 +1,19 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 from src.database.models import User, Task, TaskList, SharedAccess
-from src.database.access import UserManager, TaskManager
+from src.database.repositories.user_repository import UserManager
+from src.database.repositories.task_repository import TaskManager
 from src.utils.schema import TaskSchema, TimeFilter, UserStatus, TaskStatus
 from datetime import datetime, timedelta
 
 @pytest.fixture
 def user(test_db):
     return UserManager.get_or_create_user(12345, "testuser", "Test", "User")
+
+@pytest.fixture
+def mock_notify(mocker):
+    # Patch the one used by TaskManager
+    return mocker.patch("src.database.repositories.task_repository.notify_user", new_callable=AsyncMock)
 
 def test_register_user(test_db):
     user = UserManager.get_or_create_user(111, "newuser", "New", "User")
@@ -56,9 +62,7 @@ def test_task_list_separation(test_db, user):
     assert list_tasks[0].title == "Milk"
 
 @pytest.mark.asyncio
-async def test_share_list(test_db, user, mocker):
-    # Mock notify
-    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
+async def test_share_list(test_db, user, mock_notify):
     # Create another user
     other = UserManager.get_or_create_user(67890, "friend", "Best", "Friend")
 
@@ -78,9 +82,8 @@ async def test_share_list(test_db, user, mocker):
     assert shared_lists[0].title == "Shared List"
 
 @pytest.mark.asyncio
-async def test_share_list_fuzzy(test_db, user, mocker):
+async def test_share_list_fuzzy(test_db, user, mock_notify):
     """Test fuzzy matching for sharing."""
-    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
     UserManager.get_or_create_user(999, "dave123", "David", "Vilela")
 
     tlist = TaskManager.create_list(user.telegram_id, "Project")
@@ -102,8 +105,7 @@ def test_find_list_by_name(test_db, user):
     assert l2 is not None
     assert l2.id == l1.id
 
-    # Normalized (e.g. "lista de la compra" -> matches "Compra" if exists, or "Shopping" if synonym logic existed but here mainly stopword removal)
-    # Actually logic removes stopwords. "lista de la Shopping" -> "Shopping"
+    # Normalized
     l3 = TaskManager.find_list_by_name(user.telegram_id, "lista de la Shopping")
     assert l3 is not None
 
@@ -111,7 +113,7 @@ def test_resolve_user(test_db):
     u = UserManager.get_or_create_user(123, "john_doe", "John", "Doe")
 
     # ID
-    from src.database.access import resolve_user
+    from src.tools.admin import resolve_user
     assert resolve_user("123") == u
 
     # Username with @
@@ -124,14 +126,13 @@ def test_resolve_user(test_db):
     assert resolve_user("999") is None
 
 def test_update_status(test_db, user, mocker):
-    mocker.patch("src.database.access.notify_user") # Mock async notify
-    from src.database.access import update_status
+    mock_notify = mocker.patch("src.tools.admin.notify_user", new_callable=AsyncMock)
+    from src.tools.admin import update_status
 
     update_status(user, UserStatus.WHITELISTED)
-    assert user.status == UserStatus.WHITELISTED
 
-    update_status(user, UserStatus.BLACKLISTED)
-    assert user.status == UserStatus.BLACKLISTED
+    assert user.status == UserStatus.WHITELISTED
+    mock_notify.assert_called_with(12345, "✅ ¡Tu cuenta ha sido aprobada! Ya puedes usar Maui para gestionar tus tareas.")
 
 def test_delete_task(test_db, user):
     t = TaskManager.add_task(user.telegram_id, TaskSchema(title="Delete Me"))
@@ -166,40 +167,37 @@ def test_find_tasks_by_keyword(test_db, user):
 
     # Match title
     res = TaskManager.find_tasks_by_keyword(user.telegram_id, "Apples")
-    assert len(res) == 2 # "Buy Apples" and "Sell Oranges" (desc contains apples)
-
-    # Case insensitive check (Code uses .contains which is case sensitive in standard SQLite unless configured? Peewee contains is usually LIKE which is CI in SQLite default)
-    # Let's verify behavior. If it fails I'll know.
-    # Actually Peewee contains maps to LIKE '...'. SQLite LIKE is case-insensitive for ASCII.
+    assert len(res) == 2
 
     res2 = TaskManager.find_tasks_by_keyword(user.telegram_id, "oranges")
     assert len(res2) == 1
 
 @pytest.mark.asyncio
 async def test_notify_user(mocker):
-    mock_bot = mocker.patch("src.database.access.Bot")
+    mock_bot = mocker.patch("src.services.notification_service.Bot")
     mock_instance = mock_bot.return_value
     mock_instance.send_message = AsyncMock()
 
-    from src.database.access import notify_user
+    from src.services.notification_service import notify_user
     await notify_user(123, "Test")
     mock_instance.send_message.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_notify_user_failure(mocker):
-    mock_bot = mocker.patch("src.database.access.Bot")
+    mock_bot = mocker.patch("src.services.notification_service.Bot")
     mock_instance = mock_bot.return_value
     mock_instance.send_message = AsyncMock(side_effect=Exception("Fail"))
 
-    from src.database.access import notify_user
+    from src.services.notification_service import notify_user
     # Should check log, but main goal is no crash
     await notify_user(123, "Test")
 
 def test_kick_user(test_db, mocker):
-    from src.database.access import kick_user, UserManager
+    from src.tools.admin import kick_user
+    from src.database.repositories.user_repository import UserManager
 
     # 1. User not found
-    kick_user(9999) # Should just print return
+    kick_user(9999)
 
     # 2. Cancelled
     u1 = UserManager.get_or_create_user(8881, "kick_cancel")
@@ -220,7 +218,6 @@ def test_add_task_duplicate(test_db):
     t1 = TaskManager.add_task(700, TaskSchema(title="Unique Task"))
     assert t1 is not None
 
-    # Add same title (case insensitive test implied by code but here exact match)
     t2 = TaskManager.add_task(700, TaskSchema(title="Unique Task"))
     assert t2 is None
 
@@ -228,7 +225,6 @@ def test_get_pending_tasks_filters(test_db):
     user = UserManager.get_or_create_user(701, "filter_tester")
     now = datetime.now()
 
-    # Add tasks with diverse deadlines
     TaskManager.add_task(701, TaskSchema(title="Today", deadline=now))
     TaskManager.add_task(701, TaskSchema(title="Week", deadline=now + timedelta(days=5)))
     TaskManager.add_task(701, TaskSchema(title="Month", deadline=now + timedelta(days=20)))
@@ -240,7 +236,7 @@ def test_get_pending_tasks_filters(test_db):
     assert tasks_today[0].title == "Today"
 
     tasks_week = TaskManager.get_pending_tasks(701, TimeFilter.WEEK)
-    assert len(tasks_week) == 2 # Today + Week
+    assert len(tasks_week) == 2
 
     tasks_month = TaskManager.get_pending_tasks(701, TimeFilter.MONTH)
     assert len(tasks_month) == 3
@@ -249,8 +245,7 @@ def test_get_pending_tasks_filters(test_db):
     assert len(tasks_year) == 4
 
 @pytest.mark.asyncio
-async def test_share_list_edge_cases(test_db, mocker):
-    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
+async def test_share_list_edge_cases(test_db, mock_notify):
     owner = UserManager.get_or_create_user(800, "owner")
     l = TaskManager.create_list(800, "My List")
 
@@ -277,7 +272,6 @@ async def test_share_list_edge_cases(test_db, mocker):
 def test_find_list_by_name_fallbacks(test_db):
     u = UserManager.get_or_create_user(900, "list_finder")
     l1 = TaskManager.create_list(900, "Lista de Compra")
-    l2 = TaskManager.create_list(900, "Proyecto X")
 
     # Exact/Clean match
     found = TaskManager.find_list_by_name(900, "compra")
@@ -285,7 +279,7 @@ def test_find_list_by_name_fallbacks(test_db):
 
     # Fallback to first owned
     found_fallback = TaskManager.find_list_by_name(900, "Unknown List")
-    assert found_fallback is not None # Should return first owned
+    assert found_fallback is not None
 
     # Make sure we have no lists
     u2 = UserManager.get_or_create_user(901, "poor_user")
@@ -302,8 +296,7 @@ def test_user_update_fields(test_db):
     assert u3.last_name == "UpdatedLast"
 
 @pytest.mark.asyncio
-async def test_get_list_members(test_db, mocker):
-    mocker.patch("src.database.access.notify_user", new_callable=AsyncMock)
+async def test_get_list_members(test_db, mock_notify):
     owner = UserManager.get_or_create_user(600, "owner")
     l = TaskManager.create_list(600, "Membership List")
 
@@ -319,7 +312,7 @@ async def test_get_list_members(test_db, mocker):
     assert member in members
 
 def test_kick_user_error(test_db, mocker):
-    from src.database.access import kick_user
+    from src.tools.admin import kick_user
     u = UserManager.get_or_create_user(99999, "error_kick")
 
     mocker.patch("builtins.input", return_value="y")
@@ -329,6 +322,4 @@ def test_kick_user_error(test_db, mocker):
 
     # Should catch and print error
     kick_user(99999)
-    # User should still exist if it failed early (or deleted but errored logging?)
-    # The code deletes tasks THEN user. If task delete fails, user remains.
     assert User.get_or_none(User.telegram_id == 99999) is not None

@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING
 
 from src.services.llm_provider import LLMFactory
-from src.database.access import TaskManager, UserManager
+from src.database.repositories.task_repository import TaskManager
+from src.database.repositories.user_repository import UserManager
 from src.utils.config import Config
 import logging
 

@@ -1,8 +1,12 @@
 
+
 import pytest
-from textual.widgets import DataTable, TabbedContent
+from unittest.mock import MagicMock, AsyncMock
 from src.tui.app import DatabaseMonitor
-from src.database.access import UserManager, TaskManager
+from src.database.repositories.user_repository import UserManager
+from src.database.repositories.task_repository import TaskManager
+from src.database.models import User, Task
+from textual.widgets import DataTable, TabbedContent
 from src.utils.schema import TaskSchema, TaskStatus
 
 @pytest.mark.asyncio
