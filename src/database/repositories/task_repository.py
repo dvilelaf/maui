@@ -627,5 +627,5 @@ class TaskManager:
         return list(
             Task.select()
             .where(Task.task_list == list_id)
-            .order_by(Task.status, Task.created_at)
+            .order_by(Task.status.desc(), Task.created_at)
         )
