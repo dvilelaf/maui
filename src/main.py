@@ -11,6 +11,12 @@ from src.bot.handlers import (
 )
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from telegram import BotCommand
+from src.services.scheduler import (
+    send_weekly_summary,
+    check_deadlines_job,
+    send_pending_alert,
+)
+from datetime import time
 
 # Enable logging
 logging.basicConfig(
@@ -44,7 +50,13 @@ def main():
         return
 
     application = (
-        Application.builder().token(Config.TELEGRAM_TOKEN).post_init(post_init).build()
+        Application.builder()
+        .token(Config.TELEGRAM_TOKEN)
+        .post_init(post_init)
+        .read_timeout(30)
+        .write_timeout(30)
+        .connect_timeout(30)
+        .build()
     )
 
     # 3. Register Handlers
@@ -63,13 +75,6 @@ def main():
     # 5. Setup Scheduler
     job_queue = application.job_queue
     if job_queue:
-        from src.services.scheduler import (
-            send_weekly_summary,
-            check_deadlines_job,
-            send_pending_alert,
-        )
-        from datetime import time
-
         # Weekly summary every Monday at 8:00 AM
         job_queue.run_daily(
             send_weekly_summary, time=time(hour=8, minute=0), days=(1,)

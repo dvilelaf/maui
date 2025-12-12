@@ -5,16 +5,16 @@ build:
     docker build -t dvilela/maui:latest .
 
 # Start the Docker container
-up:
-    docker compose up -d
+up: build
+    docker compose -f docker-compose-dev.yml up -d
 
 # Stop the Docker container
 down:
-    docker compose down
+    docker compose -f docker-compose-dev.yml down
 
 # View Docker logs
 logs:
-    docker compose logs -f
+    docker compose -f docker-compose-dev.yml logs -f
 
 # Restart the Docker container
 restart: down up
@@ -63,6 +63,6 @@ blacklist target:
 kick target:
     uv run python src/tools/admin_tools.py kick {{target}}
 
-# Kill dangling processes on port 8000
+# Kill dangling processes on port 8123
 kill:
-    fuser -k 8000/tcp || true
+    fuser -k 8123/tcp || true

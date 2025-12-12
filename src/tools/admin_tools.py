@@ -2,8 +2,8 @@ import sys
 import asyncio
 import logging
 from telegram import Bot
-from src.database.models import User
-from src.database.core import init_db
+from src.database.models import User, Task
+from src.database.core import init_db, db
 from src.utils.schema import UserStatus
 from src.utils.config import Config
 
@@ -67,7 +67,6 @@ def kick_user(user_id: int):
 
         # Delete tasks first (handled by cascade usually, but explicit is safe if no FK cascade)
         # Assuming Task has ForeignKey to User.
-        from src.database.models import Task
 
         task_count = Task.delete().where(Task.user == user.telegram_id).execute()
         # Delete User
@@ -98,8 +97,6 @@ def update_all_pending(status: UserStatus):
 if __name__ == "__main__":
     init_db(Config.DATABASE_URL)
     # Ensure tables exist (crucial for first run or separate script execution)
-    from src.database.models import User, Task
-    from src.database.core import db
 
     db.connect()
     db.create_tables([User, Task], safe=True)

@@ -6,11 +6,13 @@ from contextlib import asynccontextmanager
 
 from src.utils.config import Config
 from src.database.core import db, init_db
+from src.database.models import create_tables
 from src.webapp.routers import tasks, lists, invites
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 
 @asynccontextmanager
@@ -19,6 +21,7 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Database...")
     init_db(Config.DATABASE_URL.replace("sqlite:///", ""))
     db.connect()
+    create_tables()
 
     # Coordinator init (optional if lazy loaded, but good to check)
     # coordinator already init in state.py

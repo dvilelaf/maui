@@ -4,6 +4,14 @@ from src.services.llm_provider import LLMFactory
 from src.database.repositories.task_repository import TaskManager
 from src.database.repositories.user_repository import UserManager
 import logging
+from src.utils.schema import (
+    UserIntent,
+    TimeFilter,
+    TaskStatus,
+    TARGET_ALL,
+    UserStatus,
+)
+from src.utils.formatters import format_datetime_es, format_task_es
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +39,6 @@ class Coordinator:
         """
         Main entry point for processing user messages.
         """
-        from src.utils.schema import (
-            UserIntent,
-            TimeFilter,
-            TaskStatus,
-            TARGET_ALL,
-        )
 
         # Ensure user exists
         user = self.user_manager.get_or_create_user(
@@ -47,7 +49,6 @@ class Coordinator:
         )
 
         # Access Control
-        from src.utils.schema import UserStatus
 
         if user.status != UserStatus.WHITELISTED:
             if user.status == UserStatus.PENDING:
@@ -125,8 +126,6 @@ class Coordinator:
             )
 
         if extraction.intent == UserIntent.ADD_TASK and extraction.formatted_task:
-            from src.utils.formatters import format_datetime_es
-
             # extraction.formatted_task is already a TaskSchema
             new_task = self.task_manager.add_task(user_id, extraction.formatted_task)
 
@@ -313,8 +312,6 @@ class Coordinator:
 
                     # If both are None, no change. If one is None, change. If values differ, change.
                     if old_dead != new_dead:
-                        from src.utils.formatters import format_datetime_es
-
                         old_str = (
                             format_datetime_es(old_dead) if old_dead else "Sin fecha"
                         )
@@ -340,9 +337,6 @@ class Coordinator:
     def get_task_summary(
         self, user_id: int, time_filter: str = "ALL", priority_filter: str = None
     ) -> str:
-        from src.utils.formatters import format_task_es
-        from src.utils.schema import TimeFilter
-
         # Map filter to readable text
         filter_text = {
             TimeFilter.TODAY: "para hoy",

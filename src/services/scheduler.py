@@ -3,6 +3,7 @@ import logging
 from src.database.repositories.task_repository import TaskManager
 from src.database.models import Task, User
 from datetime import datetime, timedelta
+from src.utils.formatters import format_task_es, format_datetime_es
 
 logger = logging.getLogger(__name__)
 task_manager = TaskManager()
@@ -12,7 +13,6 @@ async def send_weekly_summary(context: ContextTypes.DEFAULT_TYPE):
     """
     Sends a weekly summary to all users.
     """
-    from src.utils.formatters import format_task_es
 
     logger.info("Running weekly summary job")
     users = User.select()
@@ -35,7 +35,6 @@ async def send_pending_alert(context: ContextTypes.DEFAULT_TYPE):
     """
     Sends an alert on Fridays if there are pending tasks.
     """
-    from src.utils.formatters import format_datetime_es
 
     logger.info("Running pending alert job")
     users = User.select()

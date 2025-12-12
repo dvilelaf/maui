@@ -22,4 +22,4 @@ COPY . .
 ENV PYTHONPATH=/app
 
 # Run the bot using the virtual environment
-CMD ["/app/.venv/bin/python", "src/main.py"]
+CMD ["/app/.venv/bin/python", "-m", "src.main"]

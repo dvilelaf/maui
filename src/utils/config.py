@@ -1,5 +1,6 @@
 from typing import List, Optional
-from pydantic import Field, computed_field
+import os
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
@@ -23,7 +24,20 @@ class Settings(BaseSettings):
             "gemini-2.5-flash-lite",
         ]
     )
-    DATABASE_URL: str = Field(default="maui.db")
+    DATABASE_URL: Optional[str] = Field(default=None)
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def validate_db_url(cls, v):
+        if v and v.strip():
+            return v
+
+        # Smart default: check if we are in Docker with mounted data
+        if os.path.isdir("/app/data"):
+            return "/app/data/maui.db"
+
+        return "maui.db"
+
     LOG_LEVEL: str = Field(default="INFO")
 
     # LLM Configuration
@@ -33,7 +47,7 @@ class Settings(BaseSettings):
     GROQ_WHISPER_MODEL: str = Field(default="whisper-large-v3")
 
     # Web App Configuration
-    WEBAPP_URL: str = Field(default="https://localhost:8000")
+    WEBAPP_URL: str = Field(default="https://localhost:8123")
 
     @computed_field
     @property
