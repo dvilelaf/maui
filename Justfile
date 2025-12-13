@@ -89,3 +89,14 @@ autocomplete:
         echo "Added sourced file to ~/.bashrc"; \
     fi
     @echo "Done. Run 'source ~/.bashrc' to apply changes."
+
+# Monitor remote logs and database in split view (requires tmux)
+monitor:
+    @if ! command -v tmux > /dev/null 2>&1; then \
+        echo "Error: 'tmux' is not installed. Please install it to use this command (e.g. sudo apt install tmux)."; \
+        exit 1; \
+    fi
+    -tmux kill-session -t maui-monitor 2> /dev/null
+    tmux new-session -d -s maui-monitor "just remote-logs"
+    tmux split-window -v -t maui-monitor "just remote-db"
+    tmux attach-session -t maui-monitor
