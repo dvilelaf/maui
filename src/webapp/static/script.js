@@ -6,6 +6,7 @@ tg.expand();
 
 // State
 let userId = tg.initDataUnsafe?.user?.id;
+let expandedLists = new Set(); // Track expanded state
 // Fallback for dev if not passed (though Telegram always passes valid initData if opening via bot)
 if (!userId) {
     console.warn("No user ID found, checking URL params or defaulting.");
@@ -155,64 +156,83 @@ async function loadLists() {
 
     lists.forEach(list => {
         const isOwner = (list.owner_id == userId);
+        const isExpanded = expandedLists.has(list.id);
 
         let actionsHtml = '';
         if (isOwner) {
-            // Edit -> Share -> Palette -> Delete
             actionsHtml = `
-                <button class="icon-btn edit-btn" data-name="${escapeAttr(list.name)}" onclick="editList(${list.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                <button class="icon-btn" onclick="shareList(${list.id})"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
-                <div class="icon-btn" style="position:relative; color: #2481cc;">
+                <button class="icon-btn edit-btn" data-name="${escapeAttr(list.name)}" onclick="editList(${list.id}, this); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+                <button class="icon-btn" onclick="shareList(${list.id}); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+                <div class="icon-btn" style="position:relative; color: #2481cc;" onclick="event.stopPropagation();">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2.5 2.24 0 .46.62.8.8.8h3.48c1.67 0 3.04-1.36 3.04-3.02 0-1.34-2.5-1.52-2.5-2.24 0-.46.61-.8.8-.8z"/></svg>
                     <input type="color" value="${list.color || '#f2f2f2'}"
                         style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; padding:0; border:none; margin:0;"
                         onchange="changeListColor(${list.id}, this.value)">
                 </div>
-                <button class="icon-btn" onclick="deleteList(${list.id})" style="color: #ff3b30;">
+                <button class="icon-btn" onclick="deleteList(${list.id}); event.stopPropagation();" style="color: #ff3b30;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
             `;
         } else {
             actionsHtml = `
-                <button class="icon-btn" onclick="leaveList(${list.id})"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
+                <button class="icon-btn" onclick="leaveList(${list.id}); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
             `;
         }
 
         const el = document.createElement('div');
-        el.className = 'list-item';
+        el.className = `list-item ${isExpanded ? 'expanded' : ''}`;
+        el.id = `list-item-${list.id}`;
         // Apply background color
         el.style.backgroundColor = list.color || '#f2f2f2';
-        // Adjust text color based on brightness if needed, but for now simple
 
         el.innerHTML = `
-            <div class="list-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <div><strong>${list.name}</strong> <small>(${list.task_count})</small></div>
+            <div class="list-header" onclick="toggleList(${list.id})">
+                <div class="list-header-content">
+                    <svg class="list-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <div><strong>${list.name}</strong> <small>(${list.task_count})</small></div>
+                </div>
                 <div class="list-actions" style="display:flex; align-items:center; gap:4px;">${actionsHtml}</div>
             </div>
-            <div class="list-tasks">
-                ${list.tasks.map(t => {
+
+            <div class="list-body">
+                <div class="list-tasks">
+                    ${list.tasks.map(t => {
             const deadlineHtml = t.deadline ? `<div class="task-deadline">${formatDeadline(t.deadline)}</div>` : '';
             return `
-                    <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}">
-                       <div class="task-checkbox ${t.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${t.id}, '${t.status}')"></div>
-                       <div class="task-content">
-                            <div class="task-title">${t.content}</div>
-                            ${deadlineHtml}
-                       </div>
-                       <button class="icon-btn edit-btn" data-content="${escapeAttr(t.content)}" onclick="editTask(${t.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                       <button class="delete-btn" onclick="deleteTask(${t.id}, true)">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                       </button>
-                    </div>
-                `}).join('')}
-            </div>
-            <div class="list-add-task">
-                <input type="text" id="add-list-task-${list.id}" placeholder="Añadir a esta lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${list.id})">
-                <button onclick="addTaskToList(${list.id})">+</button>
+                        <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}">
+                        <div class="task-checkbox ${t.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${t.id}, '${t.status}')"></div>
+                        <div class="task-content">
+                                <div class="task-title">${t.content}</div>
+                                ${deadlineHtml}
+                        </div>
+                        <button class="icon-btn edit-btn" data-content="${escapeAttr(t.content)}" onclick="editTask(${t.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+                        <button class="delete-btn" onclick="deleteTask(${t.id}, true)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                        </div>
+                    `}).join('')}
+                </div>
+                <div class="list-add-task">
+                    <input type="text" id="add-list-task-${list.id}" placeholder="Añadir a esta lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${list.id})">
+                    <button onclick="addTaskToList(${list.id})">+</button>
+                </div>
             </div>
         `;
         container.appendChild(el);
     });
+}
+
+function toggleList(listId) {
+    const el = document.getElementById(`list-item-${listId}`);
+    if (!el) return;
+
+    if (expandedLists.has(listId)) {
+        expandedLists.delete(listId);
+        el.classList.remove('expanded');
+    } else {
+        expandedLists.add(listId);
+        el.classList.add('expanded');
+    }
 }
 
 async function addTask() {
