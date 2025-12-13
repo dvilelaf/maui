@@ -138,3 +138,31 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Lo siento, hubo un error al procesar tu audio. Por favor intenta de nuevo."
         )
+
+
+async def handle_invite_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle Accept/Reject invite callbacks."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+    # data format: INVITE_ACCEPT_123 or INVITE_REJECT_123
+
+    if not data.startswith("INVITE_"):
+        return
+
+    parts = data.split("_")
+    action = parts[1]  # ACCEPT or REJECT
+    list_id = int(parts[2])
+    user_id = update.effective_user.id
+
+    accept = (action == "ACCEPT")
+
+    # Process logic
+    success, msg = await get_coordinator().task_manager.respond_to_invite(user_id, list_id, accept)
+
+    # Update the message to remove buttons and show result
+    emoji = "✅" if success else "❌"
+
+    new_text = f"{query.message.text}\n\n{emoji} {msg}"
+    await query.edit_message_text(text=new_text)

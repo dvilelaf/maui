@@ -8,8 +8,9 @@ from src.bot.handlers import (
     handle_message,
     handle_voice,
     webapp_command,
+    handle_invite_response,
 )
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram import BotCommand
 from src.services.scheduler import (
     send_weekly_summary,
@@ -71,6 +72,9 @@ def main():
 
     # Voice messages
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
+
+    # Callback Queries
+    application.add_handler(CallbackQueryHandler(handle_invite_response, pattern="^INVITE_"))
 
     # 5. Setup Scheduler
     job_queue = application.job_queue
