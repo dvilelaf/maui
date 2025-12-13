@@ -163,7 +163,14 @@ async function loadLists() {
 
         let actionsHtml = '';
         if (isOwner) {
+            // Palette icon + hidden color input
             actionsHtml = `
+                <div style="display:inline-block; position:relative; width: 30px; height: 30px; vertical-align: middle;">
+                    <span style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px; pointer-events: none;">🎨</span>
+                    <input type="color" value="${list.color || '#f2f2f2'}"
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; padding:0; border:none;"
+                        onchange="changeListColor(${list.id}, this.value)">
+                </div>
                 <button class="icon-btn" data-name="${escapeAttr(list.name)}" onclick="editList(${list.id}, this)">✏️</button>
                 <button class="icon-btn" onclick="shareList(${list.id})">🔗</button>
                 <button class="icon-btn" onclick="deleteList(${list.id})" style="color: #ff3b30;">
@@ -178,6 +185,10 @@ async function loadLists() {
 
         const el = document.createElement('div');
         el.className = 'list-item';
+        // Apply background color
+        el.style.backgroundColor = list.color || '#f2f2f2';
+        // Adjust text color based on brightness if needed, but for now simple
+
         el.innerHTML = `
             <div class="list-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <div><strong>${list.name}</strong> <small>(${list.task_count})</small></div>
@@ -325,6 +336,12 @@ async function editList(listId, btnElement) {
     if (newName.trim() === currentName) return;
 
     await apiRequest(`/lists/${listId}/update`, 'POST', { name: newName, user_id: userId });
+    loadLists();
+}
+
+async function changeListColor(listId, color) {
+    if (!color) return;
+    await apiRequest(`/lists/${listId}/color`, 'POST', { color: color, user_id: userId });
     loadLists();
 }
 

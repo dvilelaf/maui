@@ -31,6 +31,36 @@ class TaskList(BaseModel):
     title = CharField()
     owner = ForeignKeyField(User, backref="owned_lists")
     created_at = DateTimeField(default=datetime.now)
+    color = CharField(default="#f2f2f2")  # Light gray default
+
+
+# ... (rest of models)
+
+def create_tables():
+    real_db = db.obj
+    if real_db is None:
+        # Fallback to default if somehow missed (should not happen in main)
+        from peewee import SqliteDatabase
+
+        real_db = SqliteDatabase("maui.db")
+        db.initialize(real_db)
+
+    # Force bind to the underlying SqliteDatabase object, bypassing Proxy issues
+    real_db.bind([User, Task, TaskList, SharedAccess])
+
+    # Create tables using the real DB object
+    real_db.create_tables([User, Task, TaskList, SharedAccess])
+
+    # Manual Migration for 'color' column
+    try:
+        from peewee import OperationalError
+        try:
+            real_db.execute_sql("ALTER TABLE tasklist ADD COLUMN color VARCHAR(255) DEFAULT '#f2f2f2'")
+        except OperationalError:
+            # Column likely acts already
+            pass
+    except Exception as e:
+        print(f"Migration warning: {e}")
 
 
 class SharedAccess(BaseModel):

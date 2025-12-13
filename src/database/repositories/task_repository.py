@@ -612,6 +612,21 @@ class TaskManager:
             return False
 
     @staticmethod
+    def edit_list_color(user_id: int, list_id: int, color_hex: str) -> bool:
+        try:
+            target_list = TaskList.get_by_id(list_id)
+            if target_list.owner_id != user_id:
+                logger.warning(f"Unauthorized list color change attempt by {user_id}")
+                return False
+
+            target_list.color = color_hex
+            target_list.save()
+            return True
+        except Exception as e:
+            logger.error(f"Error changing list color: {e}")
+            return False
+
+    @staticmethod
     def get_pending_invites(user_id: int) -> List[dict]:
         query = (
             SharedAccess.select(SharedAccess, TaskList, User)

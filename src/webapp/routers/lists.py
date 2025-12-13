@@ -13,6 +13,7 @@ class ListResponse(BaseModel):
     name: str
     owner_id: int
     task_count: int
+    color: str = "#f2f2f2"
     tasks: List[TaskResponse] = []
 
 
@@ -49,6 +50,7 @@ async def get_lists(user_id: int):
                 name=lst.title,
                 owner_id=lst.owner_id,
                 task_count=len(tasks_in_list),
+                color=lst.color or "#f2f2f2",
                 tasks=task_responses,
             )
         )
@@ -82,6 +84,24 @@ async def leave_list(list_id: int, user_id: int = Body(..., embed=True)):
 class ListUpdate(BaseModel):
     name: str
     user_id: int
+
+
+class ListColorUpdate(BaseModel):
+    color: str
+    user_id: int
+
+
+# Endpoints
+@router.post("/{list_id}/color")
+async def update_list_color(list_id: int, update: ListColorUpdate):
+    success = coordinator.task_manager.edit_list_color(
+        update.user_id, list_id, update.color
+    )
+    if not success:
+        raise HTTPException(
+            status_code=403, detail="Failed to change list color or permission denied"
+        )
+    return {"status": "success"}
 
 
 # Endpoints
