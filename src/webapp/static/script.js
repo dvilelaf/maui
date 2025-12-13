@@ -19,12 +19,7 @@ if (!userId) {
     }
 }
 
-const userInfo = document.getElementById('user-info');
-if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-    userInfo.textContent = `Hola, ${tg.initDataUnsafe.user.first_name}`;
-} else {
-    userInfo.textContent = "Modo Invitado (Usuario no detectado)";
-}
+
 
 // Routes
 const API_URL = '/api';
