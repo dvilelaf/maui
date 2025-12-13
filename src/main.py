@@ -17,7 +17,8 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler,
 )
-from telegram import BotCommand
+from telegram import BotCommand, MenuButtonWebApp, WebAppInfo
+
 from src.services.scheduler import (
     send_weekly_summary,
     check_deadlines_job,
@@ -43,6 +44,13 @@ async def post_init(application: Application):
         BotCommand("help", "Ayuda"),
     ]
     await application.bot.set_my_commands(commands)
+
+    # Set the Menu Button to open the Web App directly
+    await application.bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(
+            text="App", web_app=WebAppInfo(url=Config.WEBAPP_URL)
+        )
+    )
 
 
 def main():

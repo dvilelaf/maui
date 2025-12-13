@@ -25,7 +25,7 @@ def run_dev():
             "--host",
             "0.0.0.0",
             "--port",
-            "8000",
+            "8123",
         ],
         stdout=sys.stdout,
         stderr=sys.stderr,
