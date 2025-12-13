@@ -16,6 +16,7 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - WHITELISTED_USERS=${WHITELISTED_USERS}
       - WEBAPP_URL=${WEBAPP_URL}
+      - ADMIN_USER=${ADMIN_USER}
     dns:
       - 8.8.8.8
       - 1.1.1.1

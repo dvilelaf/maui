@@ -34,6 +34,34 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     if user_db.status == UserStatus.PENDING:
+        # Notify Admin if configured
+        if Config.ADMIN_USER:
+            admin_msg = (
+                f"🔔 <b>Nueva Solicitud de Acceso</b>\n\n"
+                f"Usuario: {user.mention_html()} (ID: {user.id})\n"
+                f"Nombre: {user.full_name}\n"
+                f"Username: @{user.username if user.username else 'N/A'}"
+            )
+            kb = [
+                [
+                    InlineKeyboardButton(
+                        "✅ Aprobar", callback_data=f"ADMIN_APPROVE_{user.id}"
+                    ),
+                    InlineKeyboardButton(
+                        "❌ Rechazar", callback_data=f"ADMIN_REJECT_{user.id}"
+                    ),
+                ]
+            ]
+            try:
+                await context.bot.send_message(
+                    chat_id=Config.ADMIN_USER,
+                    text=admin_msg,
+                    reply_markup=InlineKeyboardMarkup(kb),
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                logger.error(f"Failed to notify admin: {e}")
+
         await update.message.reply_text(
             f"¡Hola {user.first_name}! 👋\n\n"
             "Gracias por registrarte. Tu solicitud de acceso ha sido enviada a los administradores. "
@@ -168,3 +196,80 @@ async def handle_invite_response(update: Update, context: ContextTypes.DEFAULT_T
 
     new_text = f"{query.message.text}\n\n{emoji} {msg}"
     await query.edit_message_text(text=new_text)
+
+
+async def handle_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle Admin Accept/Reject callbacks."""
+    query = update.callback_query
+    await query.answer()
+
+    if update.effective_user.id != Config.ADMIN_USER:
+        await query.edit_message_text("No tienes permisos de administrador.")
+        return
+
+    data = query.data
+    # data format: ADMIN_APPROVE_123 or ADMIN_REJECT_123
+
+    parts = data.split("_")
+    action = parts[1]  # APPROVE or REJECT
+    target_user_id = int(parts[2])
+
+    user_mgr = get_coordinator().user_manager
+
+    if action == "APPROVE":
+        user_mgr.update_status(target_user_id, UserStatus.WHITELISTED)
+        result_text = f"Usuario {target_user_id} aprobado ✅"
+        # Notify user
+        try:
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text="🎉 ¡Tu cuenta ha sido aprobada! Ya puedes usar Maui. Envía /start para comenzar.",
+            )
+        except Exception as e:
+            logger.warning(f"Could not notify user {target_user_id}: {e}")
+
+    else:
+        user_mgr.update_status(target_user_id, UserStatus.BLACKLISTED)
+        result_text = f"Usuario {target_user_id} rechazado ❌"
+
+    await query.edit_message_text(text=f"{query.message.text}\n\n{result_text}")
+
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """List pending users for admin review."""
+    user = update.effective_user
+    if user.id != Config.ADMIN_USER:
+        # Silently ignore or say unauthorized
+        await update.message.reply_text("⛔ No tienes permisos de administrador.")
+        return
+
+    pending_users = get_coordinator().user_manager.get_pending_users()
+
+    if not pending_users:
+        await update.message.reply_text("✅ No hay solicitudes pendientes.")
+        return
+
+    await update.message.reply_text(
+        f"📋 <b>Solicitudes Pendientes ({len(pending_users)})</b>", parse_mode="HTML"
+    )
+
+    for u in pending_users:
+        msg = (
+            f"👤 <b>Usuario</b>\n"
+            f"ID: <code>{u.telegram_id}</code>\n"
+            f"Nombre: {u.first_name} {u.last_name or ''}\n"
+            f"User: @{u.username or 'N/A'}"
+        )
+        kb = [
+            [
+                InlineKeyboardButton(
+                    "✅ Aprobar", callback_data=f"ADMIN_APPROVE_{u.telegram_id}"
+                ),
+                InlineKeyboardButton(
+                    "❌ Rechazar", callback_data=f"ADMIN_REJECT_{u.telegram_id}"
+                ),
+            ]
+        ]
+        await update.message.reply_text(
+            msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML"
+        )

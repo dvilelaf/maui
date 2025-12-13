@@ -9,6 +9,8 @@ from src.bot.handlers import (
     handle_voice,
     webapp_command,
     handle_invite_response,
+    handle_admin_action,
+    admin_command,
 )
 from telegram.ext import (
     Application,
@@ -78,6 +80,7 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("app", webapp_command))
+    application.add_handler(CommandHandler("admin", admin_command))
 
     # Text messages
     application.add_handler(
@@ -90,6 +93,9 @@ def main():
     # Callback Queries
     application.add_handler(
         CallbackQueryHandler(handle_invite_response, pattern="^INVITE_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(handle_admin_action, pattern="^ADMIN_")
     )
 
     # 5. Setup Scheduler

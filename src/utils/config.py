@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     def LLM_PROVIDER(self) -> str:
         return self.LLM_PROVIDER_RAW.lower()
 
+    # Admin Configuration
+    ADMIN_USER: Optional[int] = Field(default=None)
+
 
 # Instantiate settings
 Config = Settings()

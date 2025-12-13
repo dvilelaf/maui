@@ -55,3 +55,23 @@ class UserManager:
             logger.info(f"User AUTO-WHITELISTED (Config): ID={telegram_id}")
 
         return user
+
+    def update_status(self, telegram_id: int, status: str) -> bool:
+        """Update the status of a user by Telegram ID."""
+        try:
+            user = User.get(User.telegram_id == telegram_id)
+            user.status = status
+            user.save()
+            logger.info(f"User status updated: ID={telegram_id} -> {status}")
+            return True
+        except User.DoesNotExist:
+            logger.warning(
+                f"Attempted to update status for non-existent user {telegram_id}"
+            )
+            return False
+
+    def get_pending_users(self) -> list[User]:
+        """Get all users with PENDING status."""
+        from src.database.models import UserStatus
+
+        return list(User.select().where(User.status == UserStatus.PENDING))
