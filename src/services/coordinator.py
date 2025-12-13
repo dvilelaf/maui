@@ -31,7 +31,7 @@ class Coordinator:
         user_id: int,
         username: str,
         content: str | bytes,
-        extraction: "TaskExtractionResponse | None" = None,
+        extractions: "list[TaskExtractionResponse] | None" = None,
         is_voice: bool = False,
         first_name: str = None,
         last_name: str = None,
@@ -49,7 +49,6 @@ class Coordinator:
         )
 
         # Access Control
-
         if user.status != UserStatus.WHITELISTED:
             if user.status == UserStatus.PENDING:
                 return "🔒 Tu cuenta está pendiente de aprobación por el administrador. Te notificaremos cuando tengas acceso."
@@ -60,11 +59,35 @@ class Coordinator:
         mime_type = "audio/ogg" if is_voice else "text/plain"
 
         # 1. Extract intent/task via Gemini
-        if not extraction:
-            extraction = self.llm.process_input(content, mime_type=mime_type)
+        # It now returns a LIST of extractions
+        if not extractions:
+            extractions = self.llm.process_input(content, mime_type=mime_type)
 
-        if not extraction.is_relevant:
-            return extraction.reasoning or "No he entendido eso. ¿Podrías repetirlo?"
+        results = []
+        for extraction in extractions:
+            if not extraction.is_relevant:
+                # Only add "I didn't understand" if it's the ONLY response
+                if len(extractions) == 1:
+                    results.append(
+                        extraction.reasoning
+                        or "No he entendido eso. ¿Podrías repetirlo?"
+                    )
+                continue
+
+            result = await self._process_single_intent(user_id, extraction)
+            if result:
+                results.append(result)
+
+        return (
+            "\n\n".join(results)
+            if results
+            else "🤔 No he podido procesar ninguna acción."
+        )
+
+    async def _process_single_intent(
+        self, user_id: int, extraction: "TaskExtractionResponse"
+    ) -> str:
+        """Helper to process a single extracted intent"""
 
         # Handle Intents
         if extraction.intent == UserIntent.CREATE_LIST:

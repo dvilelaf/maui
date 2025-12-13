@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     # Web App Configuration
     WEBAPP_URL: str = Field(default="https://localhost:8123")
 
+    @field_validator("WEBAPP_URL")
+    @classmethod
+    def validate_webapp_url(cls, v):
+        if v and not v.startswith("https://"):
+            return f"https://{v}"
+        return v
+
     @computed_field
     @property
     def GEMINI_API_KEYS(self) -> List[str]:

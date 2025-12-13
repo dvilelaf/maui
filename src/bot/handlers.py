@@ -156,10 +156,12 @@ async def handle_invite_response(update: Update, context: ContextTypes.DEFAULT_T
     list_id = int(parts[2])
     user_id = update.effective_user.id
 
-    accept = (action == "ACCEPT")
+    accept = action == "ACCEPT"
 
     # Process logic
-    success, msg = await get_coordinator().task_manager.respond_to_invite(user_id, list_id, accept)
+    success, msg = await get_coordinator().task_manager.respond_to_invite(
+        user_id, list_id, accept
+    )
 
     # Update the message to remove buttons and show result
     emoji = "✅" if success else "❌"

@@ -26,6 +26,10 @@ push:
 # Build and push
 ship: format check security build push
 
+# Deploy to Portainer (Requires .env vars)
+deploy: ship
+    uv run python src/tools/deploy.py
+
 # Formatter & Linter
 check:
     uv run ruff check src
@@ -48,6 +52,15 @@ test:
 # View Database contents
 db:
     uv run python src/tools/inspect_db.py
+
+# View Remote Database (via SSH)
+# Requires REMOTE_HOST in .env (e.g. REMOTE_HOST=user@server)
+remote-db:
+    ssh -t $REMOTE_HOST "docker exec -it maui-telegram uv run python src/tools/inspect_db.py"
+
+# View Remote Logs (via SSH)
+remote-logs:
+    ssh -t $REMOTE_HOST "docker logs -f maui-telegram"
 
 # Whitelist a user
 # Whitelist a user (ID, @username, or 'all')

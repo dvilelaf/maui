@@ -350,8 +350,12 @@ class TaskManager:
 
             kb = [
                 [
-                    InlineKeyboardButton("✅ Aceptar", callback_data=f"INVITE_ACCEPT_{list_id}"),
-                    InlineKeyboardButton("❌ Rechazar", callback_data=f"INVITE_REJECT_{list_id}")
+                    InlineKeyboardButton(
+                        "✅ Aceptar", callback_data=f"INVITE_ACCEPT_{list_id}"
+                    ),
+                    InlineKeyboardButton(
+                        "❌ Rechazar", callback_data=f"INVITE_REJECT_{list_id}"
+                    ),
                 ]
             ]
             markup = InlineKeyboardMarkup(kb)
@@ -359,7 +363,7 @@ class TaskManager:
             await notify_user(
                 target_user.telegram_id,
                 f"📩 Has sido invitado por @{owner_name} a unirte a la lista '*{tlist.title}*'.",
-                reply_markup=markup
+                reply_markup=markup,
             )
         except Exception as e:
             logger.error(f"Failed to notify user shared: {e}")

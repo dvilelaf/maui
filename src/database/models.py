@@ -36,6 +36,7 @@ class TaskList(BaseModel):
 
 # ... (rest of models)
 
+
 def create_tables():
     real_db = db.obj
     if real_db is None:
@@ -54,8 +55,11 @@ def create_tables():
     # Manual Migration for 'color' column
     try:
         from peewee import OperationalError
+
         try:
-            real_db.execute_sql("ALTER TABLE tasklist ADD COLUMN color VARCHAR(255) DEFAULT '#f2f2f2'")
+            real_db.execute_sql(
+                "ALTER TABLE tasklist ADD COLUMN color VARCHAR(255) DEFAULT '#f2f2f2'"
+            )
         except OperationalError:
             # Column likely acts already
             pass
@@ -88,19 +92,3 @@ class Task(BaseModel):
     status = CharField(default=TaskStatus.PENDING)  # PENDING, COMPLETED, CANCELLED
     reminder_sent = BooleanField(default=False)
     task_list = ForeignKeyField(TaskList, backref="tasks", null=True)
-
-
-def create_tables():
-    real_db = db.obj
-    if real_db is None:
-        # Fallback to default if somehow missed (should not happen in main)
-        from peewee import SqliteDatabase
-
-        real_db = SqliteDatabase("maui.db")
-        db.initialize(real_db)
-
-    # Force bind to the underlying SqliteDatabase object, bypassing Proxy issues
-    real_db.bind([User, Task, TaskList, SharedAccess])
-
-    # Create tables using the real DB object
-    real_db.create_tables([User, Task, TaskList, SharedAccess])

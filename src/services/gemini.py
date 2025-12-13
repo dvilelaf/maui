@@ -138,12 +138,14 @@ class GeminiService(LLMProvider):
 
     def process_input(
         self, user_input: Union[str, bytes], mime_type: str = "text/plain"
-    ) -> TaskExtractionResponse:
+    ) -> list[TaskExtractionResponse]:
         """
         Process text or audio input to extract task details.
+        Returns a LIST of responses to handle multiple intents (e.g. bulk add).
         """
         from datetime import datetime, timedelta
         import time
+
         from google.api_core.exceptions import (
             InternalServerError,
             ServiceUnavailable,
@@ -151,6 +153,13 @@ class GeminiService(LLMProvider):
         )
 
         now = datetime.now()
+        # ... (rest of setup)
+
+        # Skip to generation loop
+        # ...
+
+        # Inside the loop, replace the return logic:
+
         current_time = now.isoformat()
         day_name = now.strftime("%A")
         today_date = now.strftime("%Y-%m-%d")
@@ -202,7 +211,35 @@ class GeminiService(LLMProvider):
                     response = self.model.generate_content(prompt_parts)
                     self.logger.info(f"Gemini Raw Response: {response.text}")
 
-                    return TaskExtractionResponse.model_validate_json(response.text)
+                    from pydantic import TypeAdapter
+
+                    try:
+                        # Clean code blocks if present
+                        text = response.text.strip()
+                        if text.startswith("```json"):
+                            text = text[7:]
+                        if text.startswith("```"):
+                            text = text[3:]
+                        if text.endswith("```"):
+                            text = text[:-3]
+
+                        # Use TypeAdapter to flexible parse List or Single
+                        adapter = TypeAdapter(list[TaskExtractionResponse])
+
+                        try:
+                            # Try parsing as list first
+                            return adapter.validate_json(text)
+                        except Exception:
+                            # Try parsing as single item and wrap in list
+                            single = TaskExtractionResponse.model_validate_json(text)
+                            return [single]
+
+                    except Exception as parse_error:
+                        self.logger.error(
+                            f"Failed to parse Gemini response: {parse_error}"
+                        )
+                        # Fallback to retry or next model? For now, continue to except blocks
+                        raise parse_error
 
                 except (InternalServerError, ServiceUnavailable) as e:
                     self.logger.warning(
@@ -275,6 +312,8 @@ class GeminiService(LLMProvider):
 
         from src.utils.schema import UserIntent
 
-        return TaskExtractionResponse(
-            is_relevant=False, intent=UserIntent.UNKNOWN, reasoning=reasoning
-        )
+        return [
+            TaskExtractionResponse(
+                is_relevant=False, intent=UserIntent.UNKNOWN, reasoning=reasoning
+            )
+        ]

@@ -3,21 +3,24 @@ import logging
 from src.database.repositories.task_repository import TaskManager
 from src.database.models import Task, User
 from datetime import datetime, timedelta
-from src.utils.formatters import format_task_es, format_datetime_es
+from src.utils.formatters import format_task_es
+from src.utils.schema import TimeFilter
 
 logger = logging.getLogger(__name__)
 task_manager = TaskManager()
 
 
-from src.utils.schema import TimeFilter
-
-async def _send_summary_helper(context: ContextTypes.DEFAULT_TYPE, time_filter: TimeFilter, title: str):
+async def _send_summary_helper(
+    context: ContextTypes.DEFAULT_TYPE, time_filter: TimeFilter, title: str
+):
     """
     Generic helper to send task summaries.
     """
     users = User.select()
     for user in users:
-        tasks = task_manager.get_pending_tasks(user.telegram_id, time_filter=time_filter)
+        tasks = task_manager.get_pending_tasks(
+            user.telegram_id, time_filter=time_filter
+        )
         if tasks:
             summary = f"{title}:\n\n"
             for task in tasks:
