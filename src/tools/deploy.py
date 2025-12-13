@@ -65,8 +65,9 @@ def deploy():
             try:
                 with open("docker-compose.yml", "r") as f:
                     stack_file_content = f.read()
-                    "   Read local docker-compose.yml to update remote stack definition."
-                )
+                    print(
+                        "   Read local docker-compose.yml to update remote stack definition."
+                    )
             except FileNotFoundError:
                 print("ERROR: Could not find docker-compose.yml in current directory.")
                 sys.exit(1)

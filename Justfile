@@ -79,3 +79,13 @@ kick target:
 # Kill dangling processes on port 8123
 kill:
     fuser -k 8123/tcp || true
+
+# Setup just autocompletion for bash
+autocomplete:
+    @echo "Setting up autocompletion..."
+    @just --completions bash > ~/.just-completions.sh
+    @if ! grep -q ".just-completions.sh" ~/.bashrc; then \
+        echo 'source ~/.just-completions.sh' >> ~/.bashrc; \
+        echo "Added sourced file to ~/.bashrc"; \
+    fi
+    @echo "Done. Run 'source ~/.bashrc' to apply changes."
