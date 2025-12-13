@@ -15,7 +15,7 @@ from telegram import BotCommand
 from src.services.scheduler import (
     send_weekly_summary,
     check_deadlines_job,
-    send_pending_alert,
+    send_daily_summary,
 )
 from datetime import time
 
@@ -79,15 +79,15 @@ def main():
     # 5. Setup Scheduler
     job_queue = application.job_queue
     if job_queue:
-        # Weekly summary every Monday at 8:00 AM
+        # Weekly summary (Mondays and Fridays) at 8:00 AM
         job_queue.run_daily(
-            send_weekly_summary, time=time(hour=8, minute=0), days=(1,)
-        )  # 1 = Monday
+            send_weekly_summary, time=time(hour=8, minute=0), days=(1, 5)
+        )
 
-        # Pending alert every Friday at 8:00 AM
+        # Daily summary (Monday to Friday) at 8:00 AM
         job_queue.run_daily(
-            send_pending_alert, time=time(hour=8, minute=0), days=(5,)
-        )  # 5 = Friday
+            send_daily_summary, time=time(hour=8, minute=0), days=(1, 2, 3, 4, 5)
+        )
 
         # Check deadlines every 5 minutes
         job_queue.run_repeating(check_deadlines_job, interval=300, first=10)
