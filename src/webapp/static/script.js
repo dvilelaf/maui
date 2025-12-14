@@ -366,10 +366,10 @@ function renderListTasks(listId, tasks) {
         </div>
         <div class="list-add-task">
             <input type="text" id="add-list-task-${listId}" placeholder="Añadir a lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${listId})">
-            <input type="text" id="add-list-date-${listId}" placeholder="📅"
-                   onfocus="(this.type='date')"
+            <input type="text" id="add-list-date-${listId}" placeholder="Fecha"
+                   onfocus="(this.type='date'); this.click()"
                    onblur="(this.value ? this.type='date' : this.type='text')"
-                   style="width: 44px; padding: 4px; font-size: 16px; text-align:center; border-radius: 8px; border: 1px solid transparent; background: transparent;">
+                   style="width: 80px; padding: 8px; font-size: 14px; border-radius: 8px; border: 1px solid var(--tg-theme-hint-color); background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); margin-left: 4px;">
             <button onclick="addTaskToList(${listId})">+</button>
         </div>
      `;
