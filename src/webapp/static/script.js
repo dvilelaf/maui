@@ -366,6 +366,7 @@ function renderListTasks(listId, tasks) {
         </div>
         <div class="list-add-task">
             <input type="text" id="add-list-task-${listId}" placeholder="Añadir a lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${listId})">
+            <input type="date" id="add-list-date-${listId}" style="width: auto; padding: 4px; font-size: 11px;">
             <button onclick="addTaskToList(${listId})">+</button>
         </div>
      `;
@@ -390,9 +391,12 @@ async function toggleListMixed(listId) {
 // --- ACTIONS ---
 
 async function openAddTaskModal() {
-    const content = await showModal('Nueva Tarea', '¿Qué tienes que hacer?', true);
-    if (!content) return;
-    await apiRequest(`/tasks/${userId}/add`, 'POST', { content });
+    // Pass true for hasDate
+    const result = await showModal('Nueva Tarea', '¿Qué tienes que hacer? (Opcional: Fecha)', true, '', true);
+    if (!result || !result.content) return;
+
+    // Result is { content, deadline }
+    await apiRequest(`/tasks/${userId}/add`, 'POST', { content: result.content, deadline: result.deadline });
     refreshCurrentView();
 }
 
@@ -441,10 +445,15 @@ async function deleteTask(taskId, isFromList = false) {
 
 async function addTaskToList(listId) {
     const input = document.getElementById(`add-list-task-${listId}`);
+    const dateInput = document.getElementById(`add-list-date-${listId}`);
     const content = input.value.trim();
     if (!content) return;
+
     input.value = '';
-    await apiRequest(`/tasks/${userId}/add`, 'POST', { content, list_id: listId });
+    const deadline = dateInput ? dateInput.value : null;
+    if (dateInput) dateInput.value = ''; // Reset date
+
+    await apiRequest(`/tasks/${userId}/add`, 'POST', { content, list_id: listId, deadline: deadline });
     // Refresh list body?
     loadListTasksIntoBody(listId);
 }
@@ -586,24 +595,68 @@ document.addEventListener('touchend', function (e) {
 
 // Modal Helpers
 let modalResolver = null;
-function showModal(title, message, hasInput = false, initialValue = '') {
+// Updated signature to support Date
+function showModal(title, message, hasInput = false, initialValue = '', hasDate = false) {
     return new Promise((resolve) => {
         document.getElementById('modal-title').innerText = title;
         document.getElementById('modal-message').innerText = message;
+
         const input = document.getElementById('modal-input');
         input.value = initialValue;
         input.style.display = hasInput ? 'block' : 'none';
+
+        // Date Input handling
+        // We might need to dynamically create/toggle it if it doesn't exist in HTML yet,
+        // but let's assume we'll add it to index.html or create it here.
+        let dateInput = document.getElementById('modal-date');
+        if (!dateInput) {
+            // Create lazily if not present
+            dateInput = document.createElement('input');
+            dateInput.type = 'date';
+            dateInput.id = 'modal-date';
+            dateInput.style.width = '100%';
+            dateInput.style.marginTop = '10px';
+            dateInput.style.padding = '8px';
+            dateInput.style.boxSizing = 'border-box';
+            // Insert after text input
+            input.parentNode.insertBefore(dateInput, input.nextSibling);
+        }
+
+        // Reset date
+        dateInput.value = '';
+        dateInput.style.display = hasDate ? 'block' : 'none';
+
         document.getElementById('custom-modal').style.display = 'flex';
+
+        // Hacky way to know if we are in "date mode" for the resolver
+        document.getElementById('custom-modal').dataset.hasDate = hasDate;
+
         modalResolver = resolve;
         if (hasInput) setTimeout(() => input.focus(), 100);
     });
 }
+
 function closeModal(result) {
     const modal = document.getElementById('custom-modal');
     modal.style.display = 'none';
     if (modalResolver) {
         const input = document.getElementById('modal-input');
-        modalResolver((result && input.style.display !== 'none') ? input.value : result);
+        const dateInput = document.getElementById('modal-date');
+        const hasDate = modal.dataset.hasDate === 'true';
+
+        if (result && (input.style.display !== 'none' || hasDate)) {
+            // Return object if date was requested, otherwise string for backward compat
+            if (hasDate) {
+                modalResolver({
+                    content: input.value,
+                    deadline: dateInput.value || null
+                });
+            } else {
+                modalResolver(input.value);
+            }
+        } else {
+            modalResolver(result);
+        }
         modalResolver = null;
     }
 }

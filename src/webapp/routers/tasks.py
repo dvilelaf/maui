@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 class TaskCreate(BaseModel):
     content: str
     list_id: Optional[int] = None
+    deadline: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
@@ -52,7 +53,7 @@ async def add_task(user_id: int, task: TaskCreate):
         title=task.content,
         description="",
         priority="MEDIUM",
-        deadline=None,
+        deadline=task.deadline,
         list_name=None,
     )
 
