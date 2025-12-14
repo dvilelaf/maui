@@ -226,7 +226,7 @@ class TaskManager:
             return False
 
         updates = update_data.model_dump(exclude_unset=True)
-        updates = {k: v for k, v in updates.items() if v is not None}
+        # updates = {k: v for k, v in updates.items() if v is not None} # Removed to allow setting fields to None (e.g. deadline)
 
         if not updates:
             return False

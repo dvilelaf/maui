@@ -412,9 +412,18 @@ async function addList() {
 
 async function editTask(taskId, btnElement) {
     const currentContent = btnElement.getAttribute('data-content');
-    const newContent = await showModal('Editar', 'Contenido:', true, currentContent);
-    if (newContent && newContent.trim() !== "" && newContent !== currentContent) {
-        await apiRequest(`/tasks/${taskId}/update`, 'POST', { content: newContent, user_id: userId });
+    const currentDeadline = btnElement.getAttribute('data-deadline') || '';
+
+    // Pass hasDate=true and hasInput=true
+    // showModal signature: (title, message, hasInput, initialValue, hasDate, initialDate)
+    const result = await showModal('Editar', 'Texto:', true, currentContent, true, currentDeadline);
+
+    // result is { content, deadline } if hasDate is true
+    if (result && result.content && result.content.trim() !== "") {
+        await apiRequest(`/tasks/${taskId}/update`, 'POST', {
+            content: result.content,
+            deadline: result.deadline
+        }); // Auth header handles user identification
         refreshCurrentView();
     }
 }
@@ -596,8 +605,8 @@ document.addEventListener('touchend', function (e) {
 
 // Modal Helpers
 let modalResolver = null;
-// Updated signature to support Date
-function showModal(title, message, hasInput = false, initialValue = '', hasDate = false) {
+// Updated signature to support Date and Initial Date
+function showModal(title, message, hasInput = false, initialValue = '', hasDate = false, initialDate = '') {
     return new Promise((resolve) => {
         document.getElementById('modal-title').innerText = title;
         document.getElementById('modal-message').innerText = message;
@@ -662,7 +671,13 @@ function showModal(title, message, hasInput = false, initialValue = '', hasDate 
 
         // Reset and Toggle
         const dateInput = document.getElementById('modal-date');
-        dateInput.value = '';
+        // Handle YYYY-MM-DDT00:00:00 or similar. Input type=date expects YYYY-MM-DD
+        let formattedDate = '';
+        if (initialDate) {
+            // backend passes str(datetime) which can be "YYYY-MM-DD HH:MM:SS" OR "YYYY-MM-DDT..."
+            formattedDate = initialDate.split(/[T ]/)[0]; // Regex split on T or space
+        }
+        dateInput.value = formattedDate;
         dateWrapper.style.display = hasDate ? 'block' : 'none';
 
         document.getElementById('custom-modal').style.display = 'flex';
@@ -714,7 +729,7 @@ function getTaskInnerHtml(task) {
             <div class="task-title">${title}</div>
             ${deadlineHtml}
         </div>
-        <button class="icon-btn edit-btn" data-content="${escapedTitle}" onclick="editTask(${task.id}, this); event.stopPropagation();">
+        <button class="icon-btn edit-btn" data-content="${escapedTitle}" data-deadline="${task.deadline || ''}" onclick="editTask(${task.id}, this); event.stopPropagation();">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
         </button>
         <button class="delete-btn" onclick="deleteTask(${task.id}, true); event.stopPropagation();">
