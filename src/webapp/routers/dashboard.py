@@ -99,7 +99,9 @@ class ReorderMixedRequest(BaseModel):
 
 
 @router.post("/reorder")
-async def reorder_mixed(req: ReorderMixedRequest, user_id: int = Depends(get_current_user)):
+async def reorder_mixed(
+    req: ReorderMixedRequest, user_id: int = Depends(get_current_user)
+):
     # Ignore req.user_id, use authorized user_id
 
     # Simple logic: Iterate and update each entity with its new global index.
@@ -116,9 +118,7 @@ async def reorder_mixed(req: ReorderMixedRequest, user_id: int = Depends(get_cur
                     # Update Owned
                     res = (
                         TaskList.update(position=index)
-                        .where(
-                            (TaskList.id == item.id) & (TaskList.owner == user_id)
-                        )
+                        .where((TaskList.id == item.id) & (TaskList.owner == user_id))
                         .execute()
                     )
                     if res == 0:
@@ -130,4 +130,3 @@ async def reorder_mixed(req: ReorderMixedRequest, user_id: int = Depends(get_cur
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

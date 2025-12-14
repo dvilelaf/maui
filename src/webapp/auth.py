@@ -3,8 +3,9 @@ import hashlib
 import json
 from urllib.parse import parse_qsl
 from typing import Optional, Dict, Any
-from fastapi import Header, HTTPException, Depends
+from fastapi import Header, HTTPException
 from src.utils.config import Config
+
 
 def validate_telegram_data(init_data: str, bot_token: str) -> Optional[Dict[str, Any]]:
     """
@@ -25,22 +26,16 @@ def validate_telegram_data(init_data: str, bot_token: str) -> Optional[Dict[str,
     received_hash = parsed_data.pop("hash")
 
     # Data-check-string is a chain of key=value pairs, sorted alphabetically
-    data_check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(parsed_data.items())
-    )
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed_data.items()))
 
     # Secret key is HMAC-SHA256 of bot token with "WebAppData" as key
     secret_key = hmac.new(
-        key=b"WebAppData",
-        msg=bot_token.encode(),
-        digestmod=hashlib.sha256
+        key=b"WebAppData", msg=bot_token.encode(), digestmod=hashlib.sha256
     ).digest()
 
     # Integrity check: HMAC-SHA256 of data_check_string with secret_key
     calculated_hash = hmac.new(
-        key=secret_key,
-        msg=data_check_string.encode(),
-        digestmod=hashlib.sha256
+        key=secret_key, msg=data_check_string.encode(), digestmod=hashlib.sha256
     ).hexdigest()
 
     if calculated_hash != received_hash:
@@ -58,7 +53,7 @@ def validate_telegram_data(init_data: str, bot_token: str) -> Optional[Dict[str,
 
 
 async def get_current_user(
-    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data")
+    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
 ) -> int:
     """
     FastAPI Dependency to get the authenticated user ID.
@@ -75,11 +70,13 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Missing authentication header")
 
     if not Config.TELEGRAM_TOKEN:
-         raise HTTPException(status_code=500, detail="Server misconfiguration: No Bot Token")
+        raise HTTPException(
+            status_code=500, detail="Server misconfiguration: No Bot Token"
+        )
 
     user_data = validate_telegram_data(x_telegram_init_data, Config.TELEGRAM_TOKEN)
 
     if not user_data:
-         raise HTTPException(status_code=401, detail="Invalid authentication signature")
+        raise HTTPException(status_code=401, detail="Invalid authentication signature")
 
     return int(user_data["id"])

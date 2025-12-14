@@ -84,4 +84,3 @@ def create_tables():
 
     # Note: For production migrations, use a proper tool (e.g. peewee-migrate).
     # Manual schema monitoring is removed as per audit.
-

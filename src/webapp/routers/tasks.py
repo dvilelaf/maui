@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from pydantic import BaseModel, field_validator
 from src.webapp.state import coordinator
@@ -127,7 +127,9 @@ async def delete_task(task_id: int, user_id: int = Depends(get_current_user)):
 
 
 @router.post("/{task_id}/update")
-async def update_task_content(task_id: int, update: TaskUpdate, user_id: int = Depends(get_current_user)):
+async def update_task_content(
+    task_id: int, update: TaskUpdate, user_id: int = Depends(get_current_user)
+):
     # Check if there's anything to update
     if update.content is not None or update.deadline is not None:
         # Create schema with available fields
@@ -143,7 +145,7 @@ async def update_task_content(task_id: int, update: TaskUpdate, user_id: int = D
 
         schema_kwargs = {}
         if update.content is not None:
-            schema_kwargs['title'] = update.content
+            schema_kwargs["title"] = update.content
 
         # To distinguish between "no change" and "clear date", we rely on the payload.
         # If deadline is in update.model_dump(exclude_unset=True), we use it.
@@ -151,7 +153,7 @@ async def update_task_content(task_id: int, update: TaskUpdate, user_id: int = D
         # Let's assume content is always sent by frontend "Edit" modal for now (it is).
         # Deadline might be None (cleared) or String (set).
 
-        schema_kwargs['deadline'] = update.deadline
+        schema_kwargs["deadline"] = update.deadline
 
         schema = TaskSchema(**schema_kwargs)
 

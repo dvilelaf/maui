@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from pydantic import BaseModel
 from src.webapp.state import coordinator
@@ -27,9 +27,7 @@ async def get_invites(user_id: int = Depends(get_current_user)):
 
 @router.post("/{list_id}/respond")
 async def respond_invite_action(
-    list_id: int,
-    body: RespondInviteRequest,
-    user_id: int = Depends(get_current_user)
+    list_id: int, body: RespondInviteRequest, user_id: int = Depends(get_current_user)
 ):
     success, msg = await coordinator.task_manager.respond_to_invite(
         user_id, list_id, body.accept

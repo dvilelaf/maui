@@ -58,7 +58,6 @@ def format_task_es(task) -> str:
     priority_str = PRIORITY_MAP.get(task.priority, "⚪")
 
     return f"• [#{task.id}] *{task.title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"
-    return f"• [#{task.id}] *{task.title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"
 
 
 def format_list_created(list_title: str) -> str:
@@ -79,9 +78,7 @@ def format_list_empty(list_title: str) -> str:
 
 
 def format_task_added(task, list_title: str = None) -> str:
-    deadline_str = (
-        f" para {format_datetime_es(task.deadline)}" if task.deadline else ""
-    )
+    deadline_str = f" para {format_datetime_es(task.deadline)}" if task.deadline else ""
     if list_title:
         return f"✅ Añadido a *{list_title}*: {task.title}"
     return f"✅ Tarea guardada: *{task.title}*{deadline_str}"
@@ -100,3 +97,7 @@ def format_task_updated(title: str, changes: list[str]) -> str:
     if changes:
         msg += "\n" + "\n".join(changes)
     return msg
+
+
+def format_list_deleted(list_title: str) -> str:
+    return f"🗑️ Lista eliminada: *{list_title}*"

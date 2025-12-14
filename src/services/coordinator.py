@@ -16,12 +16,12 @@ from src.utils.formatters import (
     format_task_es,
     format_list_created,
     format_list_not_found,
-    format_share_result,
     format_list_empty,
     format_task_added,
     format_task_deleted,
     format_task_completed,
-    format_task_updated
+    format_task_updated,
+    format_list_deleted,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,6 +137,13 @@ class Coordinator:
             if extraction.formatted_task and extraction.formatted_task.list_name:
                 list_name = extraction.formatted_task.list_name
                 found_list = self.task_manager.find_list_by_name(user_id, list_name)
+
+                if not found_list:
+                    return format_list_not_found(list_name)
+
+                tasks = self.task_manager.get_tasks_in_list(found_list.id)
+                if not tasks:
+                    return format_list_empty(found_list.title)
 
                 response = [f"📝 *{found_list.title}*:"]
                 for t in tasks:

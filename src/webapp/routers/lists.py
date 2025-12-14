@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Body, Depends
-from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List
 from pydantic import BaseModel
 from src.webapp.state import coordinator
 from src.webapp.routers.tasks import TaskResponse
@@ -92,10 +92,10 @@ class ListColorUpdate(BaseModel):
 
 # Endpoints
 @router.post("/{list_id}/color")
-async def update_list_color(list_id: int, update: ListColorUpdate, user_id: int = Depends(get_current_user)):
-    success = coordinator.task_manager.edit_list_color(
-        user_id, list_id, update.color
-    )
+async def update_list_color(
+    list_id: int, update: ListColorUpdate, user_id: int = Depends(get_current_user)
+):
+    success = coordinator.task_manager.edit_list_color(user_id, list_id, update.color)
     if not success:
         raise HTTPException(
             status_code=403, detail="Failed to change list color or permission denied"
@@ -105,7 +105,9 @@ async def update_list_color(list_id: int, update: ListColorUpdate, user_id: int 
 
 # Endpoints
 @router.post("/{list_id}/update")
-async def update_list(list_id: int, update: ListUpdate, user_id: int = Depends(get_current_user)):
+async def update_list(
+    list_id: int, update: ListUpdate, user_id: int = Depends(get_current_user)
+):
     success = coordinator.task_manager.edit_list(user_id, list_id, update.name)
     if not success:
         raise HTTPException(
@@ -115,7 +117,9 @@ async def update_list(list_id: int, update: ListUpdate, user_id: int = Depends(g
 
 
 @router.post("/{list_id}/share")
-async def share_list(list_id: int, body: ShareRequest, user_id: int = Depends(get_current_user)):
+async def share_list(
+    list_id: int, body: ShareRequest, user_id: int = Depends(get_current_user)
+):
     success, msg = await coordinator.task_manager.share_list(
         user_id, list_id, body.username
     )
@@ -129,7 +133,9 @@ class ReorderRequest(BaseModel):
 
 
 @router.post("/reorder")
-async def reorder_lists_endpoint(req: ReorderRequest, user_id: int = Depends(get_current_user)):
+async def reorder_lists_endpoint(
+    req: ReorderRequest, user_id: int = Depends(get_current_user)
+):
     success = coordinator.task_manager.reorder_lists(user_id, req.list_ids)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to reorder lists")

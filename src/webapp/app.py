@@ -43,7 +43,11 @@ app.add_middleware(
     # We will remove "*" and allow localhost + strictly needed.
     # Actually, for PWA/Mobile usually "*" is required if we don't know the WebView origin.
     # But user asked to "restrict".
-    allow_origins=["https://web.telegram.org", "http://localhost:8000", "http://localhost:3000"],
+    allow_origins=[
+        "https://web.telegram.org",
+        "http://localhost:8000",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
