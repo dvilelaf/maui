@@ -37,7 +37,13 @@ app = FastAPI(title="Maui Web App", lifespan=lifespan)
 # CORS for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # Restrict origins. For Telegram WebApps, we ideally whitelist valid domains.
+    # Since this is likely localhost dev or specific deployment, we can be slightly restrictive if known.
+    # But often Telegram loads from arbitrary CDNs or local iframes.
+    # We will remove "*" and allow localhost + strictly needed.
+    # Actually, for PWA/Mobile usually "*" is required if we don't know the WebView origin.
+    # But user asked to "restrict".
+    allow_origins=["https://web.telegram.org", "http://localhost:8000", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

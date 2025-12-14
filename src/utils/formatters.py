@@ -58,3 +58,45 @@ def format_task_es(task) -> str:
     priority_str = PRIORITY_MAP.get(task.priority, "⚪")
 
     return f"• [#{task.id}] *{task.title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"
+    return f"• [#{task.id}] *{task.title}* \n  ⏳ {date_str}  |  {priority_str}\n\n"
+
+
+def format_list_created(list_title: str) -> str:
+    return f"📋 Lista creada: *{list_title}*"
+
+
+def format_list_not_found(term: str) -> str:
+    return f"❌ No encontré ninguna lista llamada '{term}'."
+
+
+def format_share_result(success: bool, msg: str) -> str:
+    emoji = "✅" if success else "⚠️"
+    return f"{emoji} {msg}"
+
+
+def format_list_empty(list_title: str) -> str:
+    return f"📝 La lista *{list_title}* está vacía."
+
+
+def format_task_added(task, list_title: str = None) -> str:
+    deadline_str = (
+        f" para {format_datetime_es(task.deadline)}" if task.deadline else ""
+    )
+    if list_title:
+        return f"✅ Añadido a *{list_title}*: {task.title}"
+    return f"✅ Tarea guardada: *{task.title}*{deadline_str}"
+
+
+def format_task_deleted(title: str) -> str:
+    return f"🗑️ Tarea eliminada: *{title}*"
+
+
+def format_task_completed(title: str) -> str:
+    return f"✅ Tarea completada: *{title}*"
+
+
+def format_task_updated(title: str, changes: list[str]) -> str:
+    msg = f"✏️ Tarea actualizada: *{title}*"
+    if changes:
+        msg += "\n" + "\n".join(changes)
+    return msg

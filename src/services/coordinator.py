@@ -11,7 +11,18 @@ from src.utils.schema import (
     TARGET_ALL,
     UserStatus,
 )
-from src.utils.formatters import format_datetime_es, format_task_es
+from src.utils.formatters import (
+    format_datetime_es,
+    format_task_es,
+    format_list_created,
+    format_list_not_found,
+    format_share_result,
+    format_list_empty,
+    format_task_added,
+    format_task_deleted,
+    format_task_completed,
+    format_task_updated
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +108,7 @@ class Coordinator:
             elif extraction.target_search_term:
                 list_name = extraction.target_search_term
             new_list = self.task_manager.create_list(user_id, list_name)
-            return f"📋 Lista creada: *{new_list.title}*"
+            return format_list_created(new_list.title)
 
         if extraction.intent == UserIntent.SHARE_LIST:
             # Requires target_search_term (list name) and shared_with (usernames)
@@ -119,9 +130,6 @@ class Coordinator:
                 success, msg = await self.task_manager.share_list(
                     user_id, target_list.id, username
                 )
-                emoji = "✅" if success else "⚠️"
-                results.append(f"{emoji} {msg}")
-
             return "\n".join(results)
 
         if extraction.intent == UserIntent.QUERY_TASKS:
@@ -129,13 +137,6 @@ class Coordinator:
             if extraction.formatted_task and extraction.formatted_task.list_name:
                 list_name = extraction.formatted_task.list_name
                 found_list = self.task_manager.find_list_by_name(user_id, list_name)
-
-                if not found_list:
-                    return f"❌ No encontré ninguna lista llamada '{list_name}'."
-
-                tasks = self.task_manager.get_tasks_in_list(found_list.id)
-                if not tasks:
-                    return f"📝 La lista *{found_list.title}* está vacía."
 
                 response = [f"📝 *{found_list.title}*:"]
                 for t in tasks:
@@ -155,16 +156,10 @@ class Coordinator:
             if not new_task:
                 return f"⚠️ Ya tienes una tarea pendiente con ese nombre: *{extraction.formatted_task.title}*."
 
-            deadline_str = (
-                f" para {format_datetime_es(new_task.deadline)}"
-                if new_task.deadline
-                else ""
+            return format_task_added(
+                new_task,
+                list_title=new_task.task_list.title if new_task.task_list else None,
             )
-
-            if new_task.task_list:
-                return f"✅ Añadido a *{new_task.task_list.title}*: {new_task.title}"
-
-            return f"✅ Tarea guardada: *{new_task.title}*{deadline_str}"
 
         # Handle List Response Intents
         if extraction.intent in (UserIntent.JOIN_LIST, UserIntent.REJECT_LIST):
@@ -219,7 +214,7 @@ class Coordinator:
 
             success = self.task_manager.delete_list(user_id, tlist.id)
             if success:
-                return f"🗑️ Lista eliminada: *{tlist.title}*"
+                return format_list_deleted(tlist.title)
             else:
                 return (
                     "❌ No se pudo eliminar la lista. Asegúrate de ser el propietario."
@@ -301,13 +296,13 @@ class Coordinator:
 
             if extraction.intent == UserIntent.CANCEL_TASK:
                 self.task_manager.delete_task(user_id, target_task.id)
-                return f"🗑️ Tarea eliminada: *{target_task.title}*"
+                return format_task_deleted(target_task.title)
 
             if extraction.intent == UserIntent.COMPLETE_TASK:
                 self.task_manager.update_task_status(
                     user_id, target_task.id, TaskStatus.COMPLETED
                 )
-                return f"✅ Tarea completada: *{target_task.title}*"
+                return format_task_completed(target_task.title)
 
             if extraction.intent == UserIntent.EDIT_TASK and extraction.formatted_task:
                 self.logger.info(
@@ -362,10 +357,7 @@ class Coordinator:
                 )
 
                 if success:
-                    msg = f"✏️ Tarea actualizada: *{target_task.title}*"
-                    if changes:
-                        msg += "\n" + "\n".join(changes)
-                    return msg
+                    return format_task_updated(target_task.title, changes)
                 else:
                     return "❌ No se pudo actualizar la tarea (quizás no hubo cambios)."
 

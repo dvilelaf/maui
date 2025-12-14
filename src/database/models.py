@@ -82,16 +82,6 @@ def create_tables():
     # Create tables using the real DB object
     real_db.create_tables([User, Task, TaskList, SharedAccess])
 
-    # Manual Migration checks
-    try:
-        from peewee import OperationalError
+    # Note: For production migrations, use a proper tool (e.g. peewee-migrate).
+    # Manual schema monitoring is removed as per audit.
 
-        # Check Task.position
-        try:
-            real_db.execute_sql(
-                "ALTER TABLE task ADD COLUMN position INTEGER DEFAULT 0"
-            )
-        except OperationalError:
-            pass
-    except Exception as e:
-        print(f"Migration warning: {e}")
