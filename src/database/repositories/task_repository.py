@@ -567,21 +567,22 @@ class TaskManager:
             task_list._sort_pos = task_list.position
 
         # Shared lists
-        shared_query = (
-            TaskList.select(TaskList, SharedAccess.position.alias("sa_position"))
-            .join(SharedAccess)
+        # Query SharedAccess to get position and joined TaskList securely
+        shared_accesses = (
+            SharedAccess.select(SharedAccess, TaskList)
+            .join(TaskList)
             .where((SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED"))
         )
+
         shared = []
-        for task_list in shared_query:
-            # Peewee aliases might be cleaner, but let's be explicit
-            # Access the position from shared access
-            task_list._sort_pos = task_list.sharedaccess.position
-            shared.append(task_list)
+        for sa in shared_accesses:
+            t_list = sa.task_list
+            t_list._sort_pos = sa.position
+            shared.append(t_list)
 
         # Merge and sort
         combined = owned + shared
-        combined.sort(key=lambda x: x._sort_pos)
+        combined.sort(key=lambda x: (x._sort_pos if x._sort_pos is not None else 0))
         return combined
 
     @staticmethod
