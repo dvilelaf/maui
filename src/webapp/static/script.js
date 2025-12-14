@@ -366,7 +366,10 @@ function renderListTasks(listId, tasks) {
         </div>
         <div class="list-add-task">
             <input type="text" id="add-list-task-${listId}" placeholder="Añadir a lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${listId})">
-            <input type="date" id="add-list-date-${listId}" style="width: auto; padding: 4px; font-size: 11px;">
+            <input type="text" id="add-list-date-${listId}" placeholder="📅"
+                   onfocus="(this.type='date')"
+                   onblur="(this.value ? this.type='date' : this.type='text')"
+                   style="width: 44px; padding: 4px; font-size: 16px; text-align:center; border-radius: 8px; border: 1px solid transparent; background: transparent;">
             <button onclick="addTaskToList(${listId})">+</button>
         </div>
      `;
@@ -606,29 +609,65 @@ function showModal(title, message, hasInput = false, initialValue = '', hasDate 
         input.style.display = hasInput ? 'block' : 'none';
 
         // Date Input handling
-        // We might need to dynamically create/toggle it if it doesn't exist in HTML yet,
-        // but let's assume we'll add it to index.html or create it here.
-        let dateInput = document.getElementById('modal-date');
-        if (!dateInput) {
-            // Create lazily if not present
-            dateInput = document.createElement('input');
-            dateInput.type = 'date';
+        // We create a wrapper with label if it doesn't exist
+        let dateWrapper = document.getElementById('modal-date-wrapper');
+        if (!dateWrapper) {
+            dateWrapper = document.createElement('div');
+            dateWrapper.id = 'modal-date-wrapper';
+            dateWrapper.style.marginTop = '16px';
+            dateWrapper.style.width = '100%';
+            dateWrapper.style.boxSizing = 'border-box';
+
+            const label = document.createElement('label');
+            label.innerText = 'Fecha de vencimiento (Opcional)';
+            label.style.display = 'block';
+            label.style.marginBottom = '8px';
+            label.style.fontSize = '14px';
+            label.style.fontWeight = '500';
+            label.style.color = 'var(--tg-theme-hint-color)';
+
+            const dateInput = document.createElement('input');
+            dateInput.type = 'text'; // Start as text for placeholder support
+            dateInput.placeholder = 'Seleccionar fecha...';
+            dateInput.onfocus = function () {
+                this.type = 'date';
+                this.click(); // Try to open picker immediately
+            };
+            dateInput.onblur = function () {
+                if (!this.value) this.type = 'text';
+            };
             dateInput.id = 'modal-date';
+
+            // Mobile-friendly styling: Prevent overflow and enforce appearance
+            dateInput.style.display = 'block';
             dateInput.style.width = '100%';
-            dateInput.style.marginTop = '10px';
-            dateInput.style.padding = '8px';
+            dateInput.style.maxWidth = '100%';
+            dateInput.style.margin = '0';
+            dateInput.style.padding = '12px';
+            dateInput.style.borderRadius = '10px';
+            dateInput.style.border = '1px solid var(--tg-theme-secondary-bg-color)';
+            dateInput.style.backgroundColor = 'var(--tg-theme-secondary-bg-color)';
+            dateInput.style.color = 'var(--tg-theme-text-color)';
+            dateInput.style.minHeight = '50px';
             dateInput.style.boxSizing = 'border-box';
+            dateInput.style.fontSize = '16px';
+            dateInput.style.fontFamily = 'inherit';
+            dateInput.style.appearance = 'none';
+            dateInput.style.webkitAppearance = 'none'; // Critical for iOS width issues
+
+            dateWrapper.appendChild(label);
+            dateWrapper.appendChild(dateInput);
+
             // Insert after text input
-            input.parentNode.insertBefore(dateInput, input.nextSibling);
+            input.parentNode.insertBefore(dateWrapper, input.nextSibling);
         }
 
-        // Reset date
+        // Reset and Toggle
+        const dateInput = document.getElementById('modal-date');
         dateInput.value = '';
-        dateInput.style.display = hasDate ? 'block' : 'none';
+        dateWrapper.style.display = hasDate ? 'block' : 'none';
 
         document.getElementById('custom-modal').style.display = 'flex';
-
-        // Hacky way to know if we are in "date mode" for the resolver
         document.getElementById('custom-modal').dataset.hasDate = hasDate;
 
         modalResolver = resolve;
