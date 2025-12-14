@@ -106,9 +106,9 @@ def main():
             send_weekly_summary, time=time(hour=8, minute=0), days=(1, 5)
         )
 
-        # Daily summary (Monday to Friday) at 8:00 AM
+        # Daily summary (Every day) at 8:00 AM
         job_queue.run_daily(
-            send_daily_summary, time=time(hour=8, minute=0), days=(1, 2, 3, 4, 5)
+            send_daily_summary, time=time(hour=8, minute=0)
         )
 
         # Check deadlines every 5 minutes
