@@ -53,33 +53,7 @@ def create_tables():
     # Create tables using the real DB object
     real_db.create_tables([User, Task, TaskList, SharedAccess])
 
-    # Manual Migration for 'color' column
-    try:
-        from peewee import OperationalError
 
-        try:
-            real_db.execute_sql(
-                "ALTER TABLE tasklist ADD COLUMN color VARCHAR(255) DEFAULT '#f2f2f2'"
-            )
-        except OperationalError:
-            pass
-
-        try:
-            real_db.execute_sql(
-                "ALTER TABLE tasklist ADD COLUMN position INTEGER DEFAULT 0"
-            )
-        except OperationalError:
-            pass
-
-        try:
-            real_db.execute_sql(
-                "ALTER TABLE sharedaccess ADD COLUMN position INTEGER DEFAULT 0"
-            )
-        except OperationalError:
-            pass
-
-    except Exception as e:
-        print(f"Migration warning: {e}")
 
 
 class SharedAccess(BaseModel):
