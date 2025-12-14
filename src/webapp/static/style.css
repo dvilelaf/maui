@@ -278,11 +278,13 @@ textarea {
     transform: scale(0.98);
 }
 
-.task-item.completed {
+.task-item.completed,
+.list-item.completed .task-content {
     opacity: 0.6;
 }
 
-.task-item.completed .task-content {
+.task-item.completed .task-content,
+.list-item.completed .task-content .task-title {
     text-decoration: line-through;
     color: var(--tg-theme-hint-color);
 }
