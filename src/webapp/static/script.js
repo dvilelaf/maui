@@ -118,10 +118,8 @@ async function loadDatedView() {
     try {
         const items = await apiRequest(`/dashboard/dated/${userId}`);
 
-        // DEBUG: Print raw outcome to screen to debug
         if (!items || items.length === 0) {
-            const debugInfo = items === null ? "null" : (Array.isArray(items) ? "Array(0)" : typeof items);
-            container.innerHTML = `<div class="empty-state">No hay tareas con fecha.<br><small style="color:red">Debug: ${debugInfo} / ${JSON.stringify(items)}</small></div>`;
+            container.innerHTML = '<div class="empty-state">No hay tareas con fecha</div>';
             return;
         }
 
