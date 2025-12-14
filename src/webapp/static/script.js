@@ -32,7 +32,7 @@ const apiRequest = async (endpoint, method = 'GET', body = null) => {
         method,
         headers: {
             'Content-Type': 'application/json',
-            // Simplified headers
+            'X-Telegram-Init-Data': tg ? tg.initData : '',
         },
     };
     if (body) {
@@ -116,7 +116,7 @@ async function loadDatedView() {
     }
 
     try {
-        const items = await apiRequest(`/dashboard/dated/${userId}`);
+        const items = await apiRequest(`/dashboard/dated`);
 
         if (!items || items.length === 0) {
             container.innerHTML = '<div class="empty-state">No hay tareas con fecha</div>';
@@ -133,17 +133,11 @@ async function loadDatedView() {
             if (item.list_id) {
                 // Task inside list card
                 const color = item.list_color || '#f2f2f2';
+                // Note: using getTaskInnerHtml inside the task-item wrapper
                 itemHtml = `
                     <div class="list-item" style="background-color: ${color}; padding: 8px;">
-                         <div class="task-item small" style="background: rgba(255,255,255,0.6); width: 100%; border-radius: 8px; border: none; box-shadow: none;">
-                            <div class="task-checkbox ${item.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${item.id}, '${item.status}')"></div>
-                            <div class="task-content">
-                                <div class="task-title">${item.title}</div>
-                                ${deadlineHtml}
-                            </div>
-                            <button class="delete-btn" onclick="deleteTask(${item.id}, true)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                            </button>
+                         <div class="task-item small ${item.status === 'COMPLETED' ? 'completed' : ''}" style="background: rgba(255,255,255,0.6); width: 100%; border-radius: 8px; border: none; box-shadow: none;">
+                            ${getTaskInnerHtml(item)}
                          </div>
                     </div>
                 `;
@@ -151,14 +145,7 @@ async function loadDatedView() {
                 // Regular task
                 itemHtml = `
                     <div class="task-item ${item.status === 'COMPLETED' ? 'completed' : ''}">
-                        <div class="task-checkbox ${item.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${item.id}, '${item.status}')"></div>
-                        <div class="task-content">
-                            <div class="task-title">${item.title}</div>
-                            ${deadlineHtml}
-                        </div>
-                         <button class="delete-btn" onclick="deleteTask(${item.id})">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
+                        ${getTaskInnerHtml(item)}
                     </div>
                  `;
             }
@@ -189,7 +176,7 @@ async function loadAllView() {
     loadInvites();
 
     try {
-        const items = await apiRequest(`/dashboard/all/${userId}`); // [{type, id, title, position...}]
+        const items = await apiRequest(`/dashboard/all`); // [{type, id, title, position...}]
 
         if (!items || items.length === 0) {
             container.innerHTML = '<div class="empty-state">No hay nada por hacer.</div>';
@@ -201,7 +188,7 @@ async function loadAllView() {
         const expandedIds = items.filter(i => i.type === 'list' && expandedLists.has(i.id)).map(i => i.id);
 
         if (expandedIds.length > 0) {
-            const allLists = await apiRequest(`/lists/${userId}`);
+            const allLists = await apiRequest(`/lists`);
             if (allLists) {
                 allLists.forEach(l => fullListsMap.set(l.id, l));
             }
@@ -274,24 +261,18 @@ async function createDashboardElement(item) {
 
     if (item.type === 'task') {
         const task = item;
-        const deadlineHtml = task.deadline ? `<div class="task-deadline">${formatDeadline(task.deadline)}</div>` : '';
+
+        // Note: Global tasks in "All" view are often styled differently (row style), but the inner content is same
+        // Wait, lines 280-282 set 'list-item' style.
+        // We need to keep the wrapper setup, but use helper for inner content.
 
         el.className = `list-item ${task.status === 'COMPLETED' ? 'completed' : ''}`;
         el.style.backgroundColor = 'var(--tg-theme-secondary-bg-color)';
         el.style.flexDirection = 'row';
         el.style.alignItems = 'center';
 
-        el.innerHTML = `
-            <div class="task-checkbox ${task.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
-            <div class="task-content">
-                <div class="task-title">${task.title}</div>
-                ${deadlineHtml}
-            </div>
-            <button class="icon-btn edit-btn" data-content="${escapeAttr(task.title)}" onclick="editTask(${task.id}, this); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-            <button class="delete-btn" onclick="deleteTask(${task.id}); event.stopPropagation();" style="opacity: 1;">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-            </button>
-        `;
+        // NOTE: getTaskInnerHtml returns the Checkbox, Content, Edit, Delete structure.
+        el.innerHTML = getTaskInnerHtml(task);
 
     } else if (item.type === 'list') {
         const list = item;
@@ -332,7 +313,7 @@ async function createDashboardElement(item) {
 
 // Helper to load tasks inside a list (client side fetch)
 async function loadListTasksIntoBody(listId) {
-    const lists = await apiRequest(`/lists/${userId}`);
+    const lists = await apiRequest(`/lists`);
     const mylist = lists.find(l => l.id == listId);
 
     if (mylist) {
@@ -347,18 +328,9 @@ function renderListTasks(listId, tasks) {
     body.innerHTML = `
         <div class="list-tasks" style="display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0;">
             ${tasks.map(t => {
-        const deadlineHtml = t.deadline ? `<div class="task-deadline">${formatDeadline(t.deadline)}</div>` : '';
         return `
                 <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}" style="width: 100%; margin: 0; border: none; background: rgba(255,255,255,0.6); box-shadow: none; border-radius: 8px;">
-                <div class="task-checkbox ${t.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${t.id}, '${t.status}')"></div>
-                <div class="task-content">
-                        <div class="task-title">${t.content}</div>
-                        ${deadlineHtml}
-                </div>
-                <button class="icon-btn edit-btn" data-content="${escapeAttr(t.content)}" onclick="editTask(${t.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                <button class="delete-btn" onclick="deleteTask(${t.id}, true)">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                </button>
+                    ${getTaskInnerHtml(t)}
                 </div>
             `}).join('')}
         </div>
@@ -374,8 +346,12 @@ function renderListTasks(listId, tasks) {
 }
 
 async function toggleListMixed(listId) {
-    if (wasDragging) return;
+    if (wasDragging) {
+        console.log("Toggle blocked by wasDragging");
+        return;
+    }
     const el = document.getElementById(`item-list-${listId}`); // Using new ID format
+    console.log(`Toggling list ${listId}, el found: ${!!el}`);
     if (!el) return;
 
     if (expandedLists.has(listId)) {
@@ -397,7 +373,7 @@ async function openAddTaskModal() {
     if (!result || !result.content) return;
 
     // Result is { content, deadline }
-    await apiRequest(`/tasks/${userId}/add`, 'POST', { content: result.content, deadline: result.deadline });
+    await apiRequest(`/tasks/add`, 'POST', { content: result.content, deadline: result.deadline });
     refreshCurrentView();
 }
 
@@ -407,10 +383,15 @@ function refreshCurrentView() {
 }
 
 async function toggleTask(taskId, currentStatus) {
-    tg.HapticFeedback.selectionChanged();
-    const endpoint = currentStatus === 'COMPLETED' ? 'uncomplete' : 'complete';
-    await apiRequest(`/tasks/${taskId}/${endpoint}`, 'POST', { user_id: userId });
-    refreshCurrentView();
+    try {
+        tg.HapticFeedback.selectionChanged();
+        const endpoint = currentStatus === 'COMPLETED' ? 'uncomplete' : 'complete';
+        await apiRequest(`/tasks/${taskId}/${endpoint}`, 'POST'); // Auth header handles user identification
+        refreshCurrentView();
+    } catch (e) {
+        console.error(e);
+        alert("Error al actualizar tarea: " + e.message);
+    }
 }
 
 async function startReorderList(listId) {
@@ -420,8 +401,8 @@ async function startReorderList(listId) {
 async function addList() {
     const name = await showModal('Nueva Lista', 'Nombre de la lista:', true);
     if (!name) return;
-    await apiRequest(`/lists/${userId}/add`, 'POST', { name });
-    loadAllView();
+    await apiRequest(`/lists/add`, 'POST', { name });
+    await loadAllView(); // Wait for view to update
     if (!document.getElementById('all-view').classList.contains('active')) {
         switchTab('all');
     }
@@ -438,11 +419,21 @@ async function editTask(taskId, btnElement) {
     }
 }
 
+// async function deleteTask(taskId, isFromList = false) {
+// if (!await showModal('Borrar', '¿Eliminar tarea?')) return;
+// try { ... }
+
 async function deleteTask(taskId, isFromList = false) {
-    if (!await showModal('Borrar', '¿Eliminar tarea?')) return;
-    await apiRequest(`/tasks/${taskId}/delete`, 'POST', { user_id: userId });
-    refreshCurrentView();
+    if (!confirm('¿Eliminar tarea?')) return;
+    try {
+        await apiRequest(`/tasks/${taskId}/delete`, 'POST'); // Auth header handles user identification
+        refreshCurrentView();
+    } catch (e) {
+        console.error(e);
+        alert("Error al eliminar tarea: " + e.message);
+    }
 }
+
 
 async function addTaskToList(listId) {
     const input = document.getElementById(`add-list-task-${listId}`);
@@ -454,17 +445,26 @@ async function addTaskToList(listId) {
     const deadline = dateInput ? dateInput.value : null;
     if (dateInput) dateInput.value = ''; // Reset date
 
-    await apiRequest(`/tasks/${userId}/add`, 'POST', { content, list_id: listId, deadline: deadline });
+    await apiRequest(`/tasks/add`, 'POST', { content, list_id: listId, deadline: deadline });
     // Refresh list body?
     loadListTasksIntoBody(listId);
 }
 
 // Reuse other list helpers
+// async function deleteList(listId) {
+// if (!await showModal('Borrar Lista', ...)) return;
+
 async function deleteList(listId) {
-    if (!await showModal('Borrar Lista', '¿Seguro que quieres eliminar esta lista?')) return;
-    await apiRequest(`/lists/${listId}/delete`, 'POST', { user_id: userId });
-    refreshCurrentView();
+    if (!confirm('¿Seguro que quieres eliminar esta lista?')) return;
+    try {
+        await apiRequest(`/lists/${listId}/delete`, 'POST');
+        refreshCurrentView();
+    } catch (e) {
+        console.error(e);
+        alert("Error al eliminar lista: " + e.message);
+    }
 }
+
 async function editList(listId, btn) {
     const name = btn.getAttribute('data-name');
     const newName = await showModal('Renombrar', 'Nuevo nombre:', true, name);
@@ -675,27 +675,52 @@ function showModal(title, message, hasInput = false, initialValue = '', hasDate 
 
 function closeModal(result) {
     const modal = document.getElementById('custom-modal');
+    const input = document.getElementById('modal-input');
+    const dateInput = document.getElementById('modal-date');
+    const hasDate = modal.dataset.hasDate === 'true'; // string comparison because dataset is string
+
     modal.style.display = 'none';
     if (modalResolver) {
-        const input = document.getElementById('modal-input');
-        const dateInput = document.getElementById('modal-date');
-        const hasDate = modal.dataset.hasDate === 'true';
-
-        if (result && (input.style.display !== 'none' || hasDate)) {
-            // Return object if date was requested, otherwise string for backward compat
-            if (hasDate) {
-                modalResolver({
-                    content: input.value,
-                    deadline: dateInput.value || null
-                });
-            } else {
-                modalResolver(input.value);
-            }
+        if (result && hasDate) {
+            modalResolver({
+                content: input.value,
+                deadline: dateInput.value || null
+            });
         } else {
-            modalResolver(result);
+            modalResolver(result ? input.value : null);
         }
-        modalResolver = null;
     }
+    modalResolver = null;
+}
+
+// --- HELPER: Centralized Task Rendering ---
+function getTaskInnerHtml(task) {
+    const deadlineHtml = task.deadline ? `<div class="task-deadline">${formatDeadline(task.deadline)}</div>` : '';
+    // Determine completed class based on task status
+    const isCompleted = task.status === 'COMPLETED';
+    const statusClass = isCompleted ? 'checked' : '';
+
+    // Handle property differences if any (backend vs frontend objects sometimes differ, but we normalize here)
+    // Actually, we should assume standard structure or handle fallbacks
+    const title = task.title || task.content || '';
+    const escapedTitle = escapeAttr(title);
+
+    // Note: The wrapper (.task-item or .list-item) is created by the caller.
+    // This function returns the INNER content.
+
+    return `
+        <div class="task-checkbox ${statusClass}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
+        <div class="task-content">
+            <div class="task-title">${title}</div>
+            ${deadlineHtml}
+        </div>
+        <button class="icon-btn edit-btn" data-content="${escapedTitle}" onclick="editTask(${task.id}, this); event.stopPropagation();">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        </button>
+        <button class="delete-btn" onclick="deleteTask(${task.id}, true); event.stopPropagation();">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+        </button>
+    `;
 }
 // Expose global
 window.closeModal = closeModal;
@@ -718,7 +743,7 @@ window.respondInvite = respondInvite;
 function escapeAttr(str) { return str ? str.replace(/"/g, '&quot;') : ''; }
 async function loadInvites() {
     const container = document.getElementById('invites-container');
-    const invites = await apiRequest(`/invites/${userId}`);
+    const invites = await apiRequest(`/invites`);
     if (!invites || invites.length === 0) {
         container.style.display = 'none';
         return;
@@ -742,7 +767,7 @@ async function loadInvites() {
 // Helper for invite response
 async function respondInvite(listId, accept) {
     try {
-        await apiRequest(`/invites/${listId}/respond`, 'POST', { user_id: userId, accept: accept });
+        await apiRequest(`/invites/${listId}/respond`, 'POST', { accept: accept });
         loadInvites(); // Refresh invites
         if (accept) loadAllView();
     } catch (e) {

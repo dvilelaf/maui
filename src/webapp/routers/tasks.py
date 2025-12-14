@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Depends
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from src.webapp.state import coordinator
 from src.utils.schema import TaskStatus, TaskSchema
+from src.webapp.auth import get_current_user
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -13,12 +14,12 @@ class TaskCreate(BaseModel):
     list_id: Optional[int] = None
     deadline: Optional[str] = None
 
-
-class TaskUpdate(BaseModel):
-    content: Optional[str] = None
-    status: Optional[str] = None
-    deadline: Optional[str] = None
-    user_id: int
+    @field_validator("deadline")
+    @classmethod
+    def empty_string_to_none(cls, v: Optional[str]) -> Optional[str]:
+        if v == "":
+            return None
+        return v
 
 
 class TaskResponse(BaseModel):
@@ -30,9 +31,9 @@ class TaskResponse(BaseModel):
 
 
 # Endpoints
-@router.get("/{user_id}", response_model=List[TaskResponse])
-async def get_tasks(user_id: int):
-    """Get all pending tasks for a user."""
+@router.get("", response_model=List[TaskResponse])
+async def get_tasks(user_id: int = Depends(get_current_user)):
+    """Get all pending tasks for authenticated user."""
     tasks = coordinator.task_manager.get_user_tasks(user_id)
     return [
         TaskResponse(
@@ -46,8 +47,8 @@ async def get_tasks(user_id: int):
     ]
 
 
-@router.post("/{user_id}/add", response_model=TaskResponse)
-async def add_task(user_id: int, task: TaskCreate):
+@router.post("/add", response_model=TaskResponse)
+async def add_task(task: TaskCreate, user_id: int = Depends(get_current_user)):
     """Add a new task."""
     schema = TaskSchema(
         title=task.content,
@@ -76,8 +77,8 @@ async def add_task(user_id: int, task: TaskCreate):
 
 
 @router.post("/{task_id}/complete")
-async def complete_task(task_id: int, user_id: int = Body(..., embed=True)):
-    # This works fine as a single body param
+async def complete_task(task_id: int, user_id: int = Depends(get_current_user)):
+    # Note: we ignore body user_id now, trusting the auth header
     success = coordinator.task_manager.update_task_status(
         user_id, task_id, TaskStatus.COMPLETED
     )
@@ -89,7 +90,7 @@ async def complete_task(task_id: int, user_id: int = Body(..., embed=True)):
 
 
 @router.post("/{task_id}/uncomplete")
-async def uncomplete_task(task_id: int, user_id: int = Body(..., embed=True)):
+async def uncomplete_task(task_id: int, user_id: int = Depends(get_current_user)):
     success = coordinator.task_manager.update_task_status(
         user_id, task_id, TaskStatus.PENDING
     )
@@ -100,8 +101,16 @@ async def uncomplete_task(task_id: int, user_id: int = Body(..., embed=True)):
     return {"status": "success"}
 
 
+class TaskUpdate(BaseModel):
+    content: Optional[str] = None
+    status: Optional[str] = None
+    deadline: Optional[str] = None
+    # user_id mixed in for backward compat if needed, but we prefer auth
+    # user_id: int  <-- Removing this from strict requirement or ignoring it
+
+
 @router.post("/{task_id}/delete")
-async def delete_task(task_id: int, user_id: int = Body(..., embed=True)):
+async def delete_task(task_id: int, user_id: int = Depends(get_current_user)):
     success = coordinator.task_manager.delete_task(user_id, task_id)
     if not success:
         raise HTTPException(
@@ -111,11 +120,11 @@ async def delete_task(task_id: int, user_id: int = Body(..., embed=True)):
 
 
 @router.post("/{task_id}/update")
-async def update_task_content(task_id: int, update: TaskUpdate):
-    # update includes user_id now
+async def update_task_content(task_id: int, update: TaskUpdate, user_id: int = Depends(get_current_user)):
     if update.content:
         schema = TaskSchema(title=update.content)
-        success = coordinator.task_manager.edit_task(update.user_id, task_id, schema)
+        # Use user_id from Depends, ignore any body user_id
+        success = coordinator.task_manager.edit_task(user_id, task_id, schema)
         if not success:
             raise HTTPException(
                 status_code=404,

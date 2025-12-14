@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Any
 from pydantic import BaseModel
 from datetime import datetime
 from src.webapp.state import coordinator
+from src.webapp.auth import get_current_user
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -25,8 +26,9 @@ class DatedItem(BaseModel):
     list_color: Optional[str]
 
 
-@router.get("/dated/{user_id}", response_model=List[DatedItem])
-async def get_dated_items(user_id: int):
+@router.get("/dated", response_model=List[DatedItem])
+async def get_dated_items(user_id: int = Depends(get_current_user)):
+    # Legacy path param removed. Frontend must use /dated
     tasks = coordinator.task_manager.get_dated_items(user_id)
     result = []
     for t in tasks:
@@ -49,8 +51,8 @@ async def get_dated_items(user_id: int):
     return result
 
 
-@router.get("/all/{user_id}")
-async def get_all_items(user_id: int):
+@router.get("/all")
+async def get_all_items(user_id: int = Depends(get_current_user)):
     # Returns mixed list of Tasks and Lists
     # We return raw dicts because Pydantic Polymorphism with "data" Any field is tricky without Unions,
     # and we want to keep it simple JSON.
@@ -97,17 +99,8 @@ class ReorderMixedRequest(BaseModel):
 
 
 @router.post("/reorder")
-async def reorder_mixed(req: ReorderMixedRequest):
-    # This might require a new repository method to handle mixed reordering
-    # For now, we update positions separately?
-    # Or strict linear order?
-    # If we want a strictly linear "Todo" view, we need to save the position
-    # relative to the mixed view.
-    # Since we added 'position' to Tasks and Lists, we can just save the index
-    # to the respective table.
-    # However, this means collision is possible between Task pos 5 and List pos 5.
-    # But get_dashboard_items sorts by position. If they collide, created_at decides.
-    # So if we save 0..N, tasks and lists will interleave correctly.
+async def reorder_mixed(req: ReorderMixedRequest, user_id: int = Depends(get_current_user)):
+    # Ignore req.user_id, use authorized user_id
 
     # Simple logic: Iterate and update each entity with its new global index.
     from src.database.models import Task, TaskList, SharedAccess, db
@@ -117,14 +110,14 @@ async def reorder_mixed(req: ReorderMixedRequest):
             for index, item in enumerate(req.items):
                 if item.type == "task":
                     Task.update(position=index).where(
-                        (Task.id == item.id) & (Task.user == req.user_id)
+                        (Task.id == item.id) & (Task.user == user_id)
                     ).execute()
                 elif item.type == "list":
                     # Update Owned
                     res = (
                         TaskList.update(position=index)
                         .where(
-                            (TaskList.id == item.id) & (TaskList.owner == req.user_id)
+                            (TaskList.id == item.id) & (TaskList.owner == user_id)
                         )
                         .execute()
                     )
@@ -132,8 +125,9 @@ async def reorder_mixed(req: ReorderMixedRequest):
                         # Update Shared
                         SharedAccess.update(position=index).where(
                             (SharedAccess.task_list == item.id)
-                            & (SharedAccess.user == req.user_id)
+                            & (SharedAccess.user == user_id)
                         ).execute()
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

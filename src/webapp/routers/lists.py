@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Body
-from typing import List
+from fastapi import APIRouter, HTTPException, Body, Depends
+from typing import List, Optional
 from pydantic import BaseModel
 from src.webapp.state import coordinator
 from src.webapp.routers.tasks import TaskResponse
+from src.webapp.auth import get_current_user
 
 router = APIRouter(prefix="/api/lists", tags=["lists"])
 
@@ -23,13 +24,13 @@ class ListCreate(BaseModel):
 
 class ShareRequest(BaseModel):
     username: str
-    user_id: int
+    # user_id: int - from auth now
 
 
 # Endpoints
-@router.get("/{user_id}", response_model=List[ListResponse])
-async def get_lists(user_id: int):
-    """Get all lists for a user."""
+@router.get("", response_model=List[ListResponse])
+async def get_lists(user_id: int = Depends(get_current_user)):
+    """Get all lists for authenticated user."""
     lists = coordinator.task_manager.get_lists(user_id)
     result = []
     for lst in lists:
@@ -57,8 +58,8 @@ async def get_lists(user_id: int):
     return result
 
 
-@router.post("/{user_id}/add", response_model=ListResponse)
-async def create_list(user_id: int, lst: ListCreate):
+@router.post("/add", response_model=ListResponse)
+async def create_list(lst: ListCreate, user_id: int = Depends(get_current_user)):
     new_list = coordinator.task_manager.create_list(user_id, lst.name)
     return ListResponse(
         id=new_list.id, name=new_list.title, owner_id=user_id, task_count=0, tasks=[]
@@ -66,7 +67,7 @@ async def create_list(user_id: int, lst: ListCreate):
 
 
 @router.post("/{list_id}/delete")
-async def delete_list(list_id: int, user_id: int = Body(..., embed=True)):
+async def delete_list(list_id: int, user_id: int = Depends(get_current_user)):
     success = coordinator.task_manager.delete_list(user_id, list_id)
     if not success:
         raise HTTPException(status_code=403, detail="Failed to delete list")
@@ -74,7 +75,7 @@ async def delete_list(list_id: int, user_id: int = Body(..., embed=True)):
 
 
 @router.post("/{list_id}/leave")
-async def leave_list(list_id: int, user_id: int = Body(..., embed=True)):
+async def leave_list(list_id: int, user_id: int = Depends(get_current_user)):
     success, msg = await coordinator.task_manager.leave_list(user_id, list_id)
     if not success:
         raise HTTPException(status_code=400, detail=msg)
@@ -83,19 +84,17 @@ async def leave_list(list_id: int, user_id: int = Body(..., embed=True)):
 
 class ListUpdate(BaseModel):
     name: str
-    user_id: int
 
 
 class ListColorUpdate(BaseModel):
     color: str
-    user_id: int
 
 
 # Endpoints
 @router.post("/{list_id}/color")
-async def update_list_color(list_id: int, update: ListColorUpdate):
+async def update_list_color(list_id: int, update: ListColorUpdate, user_id: int = Depends(get_current_user)):
     success = coordinator.task_manager.edit_list_color(
-        update.user_id, list_id, update.color
+        user_id, list_id, update.color
     )
     if not success:
         raise HTTPException(
@@ -106,19 +105,19 @@ async def update_list_color(list_id: int, update: ListColorUpdate):
 
 # Endpoints
 @router.post("/{list_id}/update")
-async def update_list(list_id: int, update: ListUpdate):
-    success = coordinator.task_manager.edit_list(update.user_id, list_id, update.name)
+async def update_list(list_id: int, update: ListUpdate, user_id: int = Depends(get_current_user)):
+    success = coordinator.task_manager.edit_list(user_id, list_id, update.name)
     if not success:
         raise HTTPException(
-            status_code=403, detail="Failed to rename list or permission denied"
+            status_code=430, detail="Failed to rename list or permission denied"
         )
     return {"status": "success"}
 
 
 @router.post("/{list_id}/share")
-async def share_list(list_id: int, body: ShareRequest):
+async def share_list(list_id: int, body: ShareRequest, user_id: int = Depends(get_current_user)):
     success, msg = await coordinator.task_manager.share_list(
-        body.user_id, list_id, body.username
+        user_id, list_id, body.username
     )
     if not success:
         raise HTTPException(status_code=400, detail=msg)
@@ -126,13 +125,12 @@ async def share_list(list_id: int, body: ShareRequest):
 
 
 class ReorderRequest(BaseModel):
-    user_id: int
     list_ids: List[int]
 
 
 @router.post("/reorder")
-async def reorder_lists_endpoint(req: ReorderRequest):
-    success = coordinator.task_manager.reorder_lists(req.user_id, req.list_ids)
+async def reorder_lists_endpoint(req: ReorderRequest, user_id: int = Depends(get_current_user)):
+    success = coordinator.task_manager.reorder_lists(user_id, req.list_ids)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to reorder lists")
     return {"status": "success"}
