@@ -104,7 +104,11 @@ function switchTab(tab) {
 
 async function loadDatedView() {
     const container = document.getElementById('dated-container');
-    container.innerHTML = '<div class="empty-state">Cargando...</div>';
+
+    // Silent Refresh: Only show loading if empty
+    if (container.children.length === 0 || container.querySelector('.empty-state')) {
+        container.innerHTML = '<div class="empty-state">Cargando...</div>';
+    }
 
     if (!userId) {
         container.innerHTML = '<div class="empty-state">Error: No User ID.</div>';
@@ -172,14 +176,22 @@ async function loadDatedView() {
 
 async function loadAllView() {
     const container = document.getElementById('all-container');
-    container.innerHTML = '<div class="empty-state">Cargando...</div>';
+
+    // Silent Refresh: Only show loading if empty
+    // Silent Refresh: Only show loading if empty or strictly the main empty state
+    // We check if the FIRST child is the empty state div, to avoid finding nested empty-states in lists
+    const firstChild = container.firstElementChild;
+    const isMainEmpty = firstChild && firstChild.classList.contains('empty-state');
+
+    if (container.children.length === 0 || isMainEmpty) {
+        container.innerHTML = '<div class="empty-state">Cargando...</div>';
+    }
 
     // Also load invites
     loadInvites();
 
     try {
         const items = await apiRequest(`/dashboard/all/${userId}`); // [{type, id, title, position...}]
-        container.innerHTML = '';
 
         if (!items || items.length === 0) {
             container.innerHTML = '<div class="empty-state">No hay nada por hacer.</div>';
@@ -197,19 +209,53 @@ async function loadAllView() {
             }
         }
 
+        // Build DocumentFragment off-screen
+        const fragment = document.createDocumentFragment();
+
         // Render mixed items
         for (const item of items) {
             item.isExpanded = expandedLists.has(item.id);
             const el = await createDashboardElement(item);
-            container.appendChild(el);
+            fragment.appendChild(el);
 
             // If expanded, hydrate immediately from cache if possible
+            if (item.type === 'list' && item.isExpanded) {
+                const listData = fullListsMap.get(item.id);
+                // We need to find the list body inside the element we just created
+                // Since 'el' is the list item wrapper, we can query inside it.
+                // However, renderListTasks expects a listId and queries document.getElementById.
+                // We should pass the ELEMENT to a modified renderListTasks or append manually.
+
+                // Hack: Since 'el' is not in DOM yet, document.getElementById won't find it.
+                // We must hydrate MANUALLY here or append fragment first?
+                // Replacing children first is better, but then we have a split second unhydrated?
+                // Actually, createDashboardElement returns the div. We can modify it directly.
+
+                if (listData) {
+                    const body = el.querySelector(`.list-body`);
+                    if (body) {
+                        body.style.display = 'block'; // Ensure visible logic matches CSS
+                        // Manual renderListTasks logic reusing the HTML generator would be ideal,
+                        // but let's stick to the existing pattern:
+                        // We can't use renderListTasks because it queries by ID.
+                        // Let's defer hydration until AFTER replaceChildren.
+                        // Since data is already fetched, the user won't see a spinner.
+                    }
+                }
+            }
+        }
+
+        // atomic swap
+        container.replaceChildren(fragment);
+
+        // Post-render hydration for lists (now they are in DOM)
+        // This is fast enough to be imperceptible usually, but let's do it immediately.
+        for (const item of items) {
             if (item.type === 'list' && item.isExpanded) {
                 const listData = fullListsMap.get(item.id);
                 if (listData) {
                     renderListTasks(item.id, listData.tasks);
                 } else {
-                    // Fallback to fetch if not in map (should not happen if optimization worked)
                     loadListTasksIntoBody(item.id);
                 }
             }
