@@ -1,26 +1,27 @@
+// Initialize Telegram WebApp carefully
+let tg = null;
+let userId = null;
 
-const tg = window.Telegram.WebApp;
-
-// Initialize
-tg.expand();
+try {
+    if (window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
+        tg.expand();
+        userId = tg.initDataUnsafe?.user?.id;
+    }
+} catch (e) {
+    console.warn("Telegram WebApp not initialized:", e);
+}
 
 // State
-let userId = tg.initDataUnsafe?.user?.id;
 let expandedLists = new Set(); // Track expanded state
-// Fallback for dev if not passed (though Telegram always passes valid initData if opening via bot)
+
 if (!userId) {
     console.warn("No user ID found, checking URL params or defaulting.");
-    // Try to parse from URL query params (custom dev way)
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('user_id')) {
         userId = urlParams.get('user_id');
-    } else {
-        // Fallback for dev - this lets the UI load even if empty
-        // userId = 599142; // Example ID from logs
     }
 }
-
-
 
 // Routes
 const API_URL = '/api';
@@ -31,33 +32,29 @@ const apiRequest = async (endpoint, method = 'GET', body = null) => {
         method,
         headers: {
             'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true',
+            // Simplified headers
         },
     };
     if (body) {
         options.body = JSON.stringify(body);
     }
+    // Cache busting
+    const url = `${API_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}t=${new Date().getTime()}`;
+    const response = await fetch(url, options);
+
+    let data = null;
     try {
-        const response = await fetch(`${API_URL}${endpoint}`, options);
-
-        let data = null;
-        try {
-            data = await response.json();
-        } catch (jsonError) {
-            // Ignore if no JSON body
-        }
-
-        if (!response.ok) {
-            const errorMsg = (data && data.detail) ? data.detail : `API Error ${response.status}`;
-            throw new Error(errorMsg);
-        }
-
-        return data;
-    } catch (e) {
-        // Use custom modal for errors instead of tg.showAlert
-        await showModal('Error', e.message);
-        return null;
+        data = await response.json();
+    } catch (jsonError) {
+        // Ignore if no JSON body
     }
+
+    if (!response.ok) {
+        const errorMsg = (data && data.detail) ? data.detail : `API Error ${response.status}`;
+        throw new Error(errorMsg);
+    }
+
+    return data;
 };
 
 function formatDeadline(dateString) {
@@ -65,179 +62,399 @@ function formatDeadline(dateString) {
     const date = new Date(dateString);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Normalize date to check calendar days
     const checkDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
     const diffTime = checkDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) {
-        return `<span class="deadline-expired">Vencida el ${date.toLocaleDateString()}</span>`;
+        return `<span class="deadline-expired">vencida el ${date.toLocaleDateString()}</span>`;
     } else if (diffDays === 0) {
-        // Check if time is also passed if needed, but "Today" is usually fine.
-        // If exact time matters:
-        if (date < now) return `<span class="deadline-urgent">Vence hoy (ya pasó la hora)</span>`;
-        return `<span class="deadline-today">Hoy</span>`;
+        if (date < now) return `<span class="deadline-expired">hoy (vencida)</span>`;
+        return `<span class="deadline-today">hoy</span>`;
     } else if (diffDays === 1) {
-        return `<span class="deadline-soon">Mañana</span>`;
+        return `<span class="deadline-soon">mañana</span>`;
     } else if (diffDays < 7) {
-        return `<span class="deadline-week">En ${diffDays} días (${date.toLocaleDateString(undefined, { weekday: 'long' })})</span>`;
+        return `<span class="deadline-week">${date.toLocaleDateString(undefined, { weekday: 'long' })}</span>`;
     } else {
         return `<span class="deadline-future">${date.toLocaleDateString()}</span>`;
     }
 }
 
-async function loadTasks() {
-    const container = document.getElementById('tasks-container');
+// --- VIEWS ---
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+
+    // Update styling for active tab
+    const buttons = document.querySelectorAll('.tab-btn');
+    console.log(`Switching to tab: ${tab}, userId: ${userId}`);
+    if (tab === 'dated') {
+        buttons[0].classList.add('active');
+        document.getElementById('dated-view').classList.add('active');
+        loadDatedView();
+    } else if (tab === 'all') {
+        buttons[1].classList.add('active');
+        document.getElementById('all-view').classList.add('active');
+        loadAllView();
+    }
+}
+
+async function loadDatedView() {
+    const container = document.getElementById('dated-container');
     container.innerHTML = '<div class="empty-state">Cargando...</div>';
 
     if (!userId) {
-        container.innerHTML = '<div class="empty-state">Error: No User ID found.<br>Use ?user_id=123 in URL.</div>';
+        container.innerHTML = '<div class="empty-state">Error: No User ID.</div>';
         return;
     }
 
     try {
-        const tasks = await apiRequest(`/tasks/${userId}`);
-        container.innerHTML = '';
+        const items = await apiRequest(`/dashboard/dated/${userId}`);
 
-        if (!tasks || tasks.length === 0) {
-            container.innerHTML = '<div class="empty-state">No hay tareas pendientes. ¡Buen trabajo! 🪝</div>';
+        // DEBUG: Print raw outcome to screen to debug
+        if (!items || items.length === 0) {
+            const debugInfo = items === null ? "null" : (Array.isArray(items) ? "Array(0)" : typeof items);
+            container.innerHTML = `<div class="empty-state">No hay tareas con fecha.<br><small style="color:red">Debug: ${debugInfo} / ${JSON.stringify(items)}</small></div>`;
             return;
         }
 
-        tasks.forEach(task => {
-            const deadlineHtml = task.deadline ? `<div class="task-deadline">${formatDeadline(task.deadline)}</div>` : '';
-            const el = document.createElement('div');
-            el.className = `task-item ${task.status === 'COMPLETED' ? 'completed' : ''}`;
-            el.innerHTML = `
-            <div class="task-checkbox ${task.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}')"></div>
-            <div class="task-content">
-                <div class="task-title">${task.content}</div>
-                ${deadlineHtml}
-            </div>
-            <button class="icon-btn edit-btn" data-content="${escapeAttr(task.content)}" onclick="editTask(${task.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-            <button class="delete-btn" onclick="deleteTask(${task.id})">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
-        `;
-            container.appendChild(el);
+        container.innerHTML = ''; // Clear "Waiting..." or static
+        items.forEach(item => {
+            const deadlineHtml = item.deadline ? `<div class="task-deadline">${formatDeadline(item.deadline)}</div>` : '';
+
+            // If item belongs to list, show card style
+            let itemHtml = '';
+
+            if (item.list_id) {
+                // Task inside list card
+                const color = item.list_color || '#f2f2f2';
+                itemHtml = `
+                    <div class="list-item" style="background-color: ${color}; padding: 8px;">
+                         <div class="task-item small" style="background: rgba(255,255,255,0.6); width: 100%; border-radius: 8px; border: none; box-shadow: none;">
+                            <div class="task-checkbox ${item.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${item.id}, '${item.status}')"></div>
+                            <div class="task-content">
+                                <div class="task-title">${item.title}</div>
+                                ${deadlineHtml}
+                            </div>
+                            <button class="delete-btn" onclick="deleteTask(${item.id}, true)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            </button>
+                         </div>
+                    </div>
+                `;
+            } else {
+                // Regular task
+                itemHtml = `
+                    <div class="task-item ${item.status === 'COMPLETED' ? 'completed' : ''}">
+                        <div class="task-checkbox ${item.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${item.id}, '${item.status}')"></div>
+                        <div class="task-content">
+                            <div class="task-title">${item.title}</div>
+                            ${deadlineHtml}
+                        </div>
+                         <button class="delete-btn" onclick="deleteTask(${item.id})">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
+                    </div>
+                 `;
+            }
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = itemHtml;
+            container.appendChild(wrapper.firstElementChild);
         });
+
     } catch (e) {
         container.innerHTML = `<div class="empty-state">API Error: ${e.message}</div>`;
     }
 }
 
-function escapeAttr(str) {
-    if (!str) return '';
-    return str.replace(/"/g, '&quot;');
-}
-
-async function loadLists() {
-    const container = document.getElementById('lists-container');
+async function loadAllView() {
+    const container = document.getElementById('all-container');
     container.innerHTML = '<div class="empty-state">Cargando...</div>';
-
-    if (!userId) {
-        container.innerHTML = '<div class="empty-state">Please log in.</div>';
-        return;
-    }
-    const lists = await apiRequest(`/lists/${userId}`);
-    container.innerHTML = '';
 
     // Also load invites
     loadInvites();
 
-    if (!lists || lists.length === 0) {
-        container.innerHTML = '<div class="empty-state">No hay listas aún. ¡Crea una!</div>';
-        return;
-    }
+    try {
+        const items = await apiRequest(`/dashboard/all/${userId}`); // [{type, id, title, position...}]
+        container.innerHTML = '';
 
-    lists.forEach(list => {
-        const isOwner = (list.owner_id == userId);
-        const isExpanded = expandedLists.has(list.id);
-
-        let actionsHtml = '';
-        if (isOwner) {
-            actionsHtml = `
-                <button class="icon-btn edit-btn" data-name="${escapeAttr(list.name)}" onclick="editList(${list.id}, this); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                <button class="icon-btn" onclick="shareList(${list.id}); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
-                <div class="icon-btn" style="position:relative; color: #2481cc;" onclick="event.stopPropagation();">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2.5 2.24 0 .46.62.8.8.8h3.48c1.67 0 3.04-1.36 3.04-3.02 0-1.34-2.5-1.52-2.5-2.24 0-.46.61-.8.8-.8z"/></svg>
-                    <input type="color" value="${list.color || '#f2f2f2'}"
-                        style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; padding:0; border:none; margin:0;"
-                        oninput="previewListColor(${list.id}, this.value)"
-                        onchange="saveListColor(${list.id}, this.value)">
-                </div>
-                <button class="icon-btn" onclick="deleteList(${list.id}); event.stopPropagation();" style="color: #ff3b30;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-            `;
-        } else {
-            actionsHtml = `
-                <button class="icon-btn" onclick="leaveList(${list.id}); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
-            `;
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div class="empty-state">No hay nada por hacer.</div>';
+            return;
         }
 
-        const el = document.createElement('div');
-        el.className = `list-item ${isExpanded ? 'expanded' : ''}`;
-        el.id = `list-item-${list.id}`;
-        el.ontouchstart = (e) => handleTouchStart(e, list.id);
-        // Apply background color
+        // Optimization: if we have expanded lists, fetch full lists data ONCE
+        let fullListsMap = new Map();
+        const expandedIds = items.filter(i => i.type === 'list' && expandedLists.has(i.id)).map(i => i.id);
+
+        if (expandedIds.length > 0) {
+            const allLists = await apiRequest(`/lists/${userId}`);
+            if (allLists) {
+                allLists.forEach(l => fullListsMap.set(l.id, l));
+            }
+        }
+
+        // Render mixed items
+        for (const item of items) {
+            item.isExpanded = expandedLists.has(item.id);
+            const el = await createDashboardElement(item);
+            container.appendChild(el);
+
+            // If expanded, hydrate immediately from cache if possible
+            if (item.type === 'list' && item.isExpanded) {
+                const listData = fullListsMap.get(item.id);
+                if (listData) {
+                    renderListTasks(item.id, listData.tasks);
+                } else {
+                    // Fallback to fetch if not in map (should not happen if optimization worked)
+                    loadListTasksIntoBody(item.id);
+                }
+            }
+        }
+
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state">API Error: ${e.message}</div>`;
+    }
+}
+
+async function createDashboardElement(item) {
+    const el = document.createElement('div');
+    // Common ID format for drag
+    el.id = `item-${item.type}-${item.id}`;
+
+    // Drag handlers
+    el.ontouchstart = (e) => handleTouchStart(e, item.type, item.id);
+
+    if (item.type === 'task') {
+        const task = item;
+        const deadlineHtml = task.deadline ? `<div class="task-deadline">${formatDeadline(task.deadline)}</div>` : '';
+
+        el.className = `list-item ${task.status === 'COMPLETED' ? 'completed' : ''}`;
+        el.style.backgroundColor = 'var(--tg-theme-secondary-bg-color)';
+        el.style.flexDirection = 'row';
+        el.style.alignItems = 'center';
+
+        el.innerHTML = `
+            <div class="task-checkbox ${task.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
+            <div class="task-content">
+                <div class="task-title">${task.title}</div>
+                ${deadlineHtml}
+            </div>
+            <button class="icon-btn edit-btn" data-content="${escapeAttr(task.title)}" onclick="editTask(${task.id}, this); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+            <button class="delete-btn" onclick="deleteTask(${task.id}); event.stopPropagation();" style="opacity: 1;">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            </button>
+        `;
+
+    } else if (item.type === 'list') {
+        const list = item;
+        el.className = `list-item ${list.isExpanded ? 'expanded' : ''}`;
         el.style.backgroundColor = list.color || '#f2f2f2';
 
         el.innerHTML = `
-            <div class="list-header" onclick="toggleList(${list.id})">
+            <div class="list-header" onclick="toggleListMixed(${list.id})">
                 <div class="list-header-content">
                     <svg class="list-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    <div><strong>${list.name}</strong> <small>(${list.task_count})</small></div>
+                    <div><strong>${list.title}</strong> <small>(${list.task_count})</small></div>
                 </div>
-                <div class="list-actions" style="display:flex; align-items:center; gap:4px;">${actionsHtml}</div>
+                <div class="list-actions" style="display:flex; align-items:center; gap:4px;">
+                     <button class="icon-btn edit-btn" data-name="${escapeAttr(list.title)}" onclick="editList(${list.id}, this); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+                      <!-- Color Picker -->
+                    <div class="icon-btn" style="position:relative; color: #2481cc;" onclick="event.stopPropagation();">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2.5 2.24 0 .46.62.8.8.8h3.48c1.67 0 3.04-1.36 3.04-3.02 0-1.34-2.5-1.52-2.5-2.24 0-.46.61-.8.8-.8z"/></svg>
+                        <input type="color" value="${list.color || '#f2f2f2'}"
+                            style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"
+                            oninput="previewListColorMixed('item-list-${list.id}', this.value)"
+                            onchange="saveListColor(${list.id}, this.value)">
+                    </div>
+                     <button class="icon-btn" onclick="deleteList(${list.id}); event.stopPropagation();" style="color: #ff3b30;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </div>
             </div>
-
-            <div class="list-body">
-                <div class="list-tasks">
-                    ${list.tasks.map(t => {
-            const deadlineHtml = t.deadline ? `<div class="task-deadline">${formatDeadline(t.deadline)}</div>` : '';
-            return `
-                        <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}">
-                        <div class="task-checkbox ${t.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${t.id}, '${t.status}')"></div>
-                        <div class="task-content">
-                                <div class="task-title">${t.content}</div>
-                                ${deadlineHtml}
-                        </div>
-                        <button class="icon-btn edit-btn" data-content="${escapeAttr(t.content)}" onclick="editTask(${t.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
-                        <button class="delete-btn" onclick="deleteTask(${t.id}, true)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
-                        </div>
-                    `}).join('')}
-                </div>
-                <div class="list-add-task">
-                    <input type="text" id="add-list-task-${list.id}" placeholder="Añadir a esta lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${list.id})">
-                    <button onclick="addTaskToList(${list.id})">+</button>
-                </div>
+            <div class="list-body" id="list-body-${list.id}">
+                <div class="empty-state" style="font-size:12px; margin:0;">Loading...</div>
             </div>
         `;
-        container.appendChild(el);
-    });
+
+        // Removed eager loading call here to avoid DOM issue
+    }
+
+    return el;
 }
 
-// Drag and Drop Logic
+// Helper to load tasks inside a list (client side fetch)
+async function loadListTasksIntoBody(listId) {
+    const lists = await apiRequest(`/lists/${userId}`);
+    const mylist = lists.find(l => l.id == listId);
+
+    if (mylist) {
+        renderListTasks(listId, mylist.tasks);
+    }
+}
+
+function renderListTasks(listId, tasks) {
+    const body = document.getElementById(`list-body-${listId}`);
+    if (!body) return;
+
+    body.innerHTML = `
+        <div class="list-tasks" style="display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0;">
+            ${tasks.map(t => {
+        const deadlineHtml = t.deadline ? `<div class="task-deadline">${formatDeadline(t.deadline)}</div>` : '';
+        return `
+                <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}" style="width: 100%; margin: 0; border: none; background: rgba(255,255,255,0.6); box-shadow: none; border-radius: 8px;">
+                <div class="task-checkbox ${t.status === 'COMPLETED' ? 'checked' : ''}" onclick="toggleTask(${t.id}, '${t.status}')"></div>
+                <div class="task-content">
+                        <div class="task-title">${t.content}</div>
+                        ${deadlineHtml}
+                </div>
+                <button class="icon-btn edit-btn" data-content="${escapeAttr(t.content)}" onclick="editTask(${t.id}, this)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+                <button class="delete-btn" onclick="deleteTask(${t.id}, true)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+                </div>
+            `}).join('')}
+        </div>
+        <div class="list-add-task">
+            <input type="text" id="add-list-task-${listId}" placeholder="Añadir a lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${listId})">
+            <button onclick="addTaskToList(${listId})">+</button>
+        </div>
+     `;
+}
+
+async function toggleListMixed(listId) {
+    if (wasDragging) return;
+    const el = document.getElementById(`item-list-${listId}`); // Using new ID format
+    if (!el) return;
+
+    if (expandedLists.has(listId)) {
+        expandedLists.delete(listId);
+        el.classList.remove('expanded');
+    } else {
+        expandedLists.add(listId);
+        el.classList.add('expanded');
+        loadListTasksIntoBody(listId);
+    }
+}
+
+
+// --- ACTIONS ---
+
+async function openAddTaskModal() {
+    const content = await showModal('Nueva Tarea', '¿Qué tienes que hacer?', true);
+    if (!content) return;
+    await apiRequest(`/tasks/${userId}/add`, 'POST', { content });
+    refreshCurrentView();
+}
+
+function refreshCurrentView() {
+    if (document.getElementById('dated-view').classList.contains('active')) loadDatedView();
+    else loadAllView();
+}
+
+async function toggleTask(taskId, currentStatus) {
+    tg.HapticFeedback.selectionChanged();
+    const endpoint = currentStatus === 'COMPLETED' ? 'uncomplete' : 'complete';
+    await apiRequest(`/tasks/${taskId}/${endpoint}`, 'POST', { user_id: userId });
+    refreshCurrentView();
+}
+
+async function startReorderList(listId) {
+    alert("Mantén presionado para reordenar.");
+}
+
+async function addList() {
+    const name = await showModal('Nueva Lista', 'Nombre de la lista:', true);
+    if (!name) return;
+    await apiRequest(`/lists/${userId}/add`, 'POST', { name });
+    loadAllView();
+    if (!document.getElementById('all-view').classList.contains('active')) {
+        switchTab('all');
+    }
+}
+
+// ... Reuse edit/delete/share helpers from before with minor updates
+
+async function editTask(taskId, btnElement) {
+    const currentContent = btnElement.getAttribute('data-content');
+    const newContent = await showModal('Editar', 'Contenido:', true, currentContent);
+    if (newContent && newContent.trim() !== "" && newContent !== currentContent) {
+        await apiRequest(`/tasks/${taskId}/update`, 'POST', { content: newContent, user_id: userId });
+        refreshCurrentView();
+    }
+}
+
+async function deleteTask(taskId, isFromList = false) {
+    if (!await showModal('Borrar', '¿Eliminar tarea?')) return;
+    await apiRequest(`/tasks/${taskId}/delete`, 'POST', { user_id: userId });
+    refreshCurrentView();
+}
+
+async function addTaskToList(listId) {
+    const input = document.getElementById(`add-list-task-${listId}`);
+    const content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+    await apiRequest(`/tasks/${userId}/add`, 'POST', { content, list_id: listId });
+    // Refresh list body?
+    loadListTasksIntoBody(listId);
+}
+
+// Reuse other list helpers
+async function deleteList(listId) {
+    if (!await showModal('Borrar Lista', '¿Seguro que quieres eliminar esta lista?')) return;
+    await apiRequest(`/lists/${listId}/delete`, 'POST', { user_id: userId });
+    refreshCurrentView();
+}
+async function editList(listId, btn) {
+    const name = btn.getAttribute('data-name');
+    const newName = await showModal('Renombrar', 'Nuevo nombre:', true, name);
+    if (newName) {
+        await apiRequest(`/lists/${listId}/update`, 'POST', { name: newName, user_id: userId });
+        refreshCurrentView();
+    }
+}
+
+async function inviteUser(listId) { /* ... same ... */ } // reusing old shareList logic
+async function shareList(listId) {
+    const username = await showModal('Invitar', 'Introduce @usuario o ID:', true);
+    if (username) {
+        const res = await apiRequest(`/lists/${listId}/share`, 'POST', { username, user_id: userId });
+        if (res) alert(res.message);
+    }
+}
+async function saveListColor(listId, color) {
+    await apiRequest(`/lists/${listId}/color`, 'POST', { color, user_id: userId });
+}
+function previewListColorMixed(elemId, color) {
+    const el = document.getElementById(elemId);
+    if (el) el.style.backgroundColor = color;
+}
+
+
+// --- DRAG AND DROP (MIXED) ---
 let dragTimer = null;
-let dragElement = null;
 let isDragging = false;
-let wasDragging = false; // To prevent click after drag
+let wasDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragElement = null;
 
-function handleTouchStart(e, listId) {
-    if (e.target.closest('button') || e.target.closest('input')) return; // Ignore clicks on controls
+function handleTouchStart(e, type, id) {
+    if (e.target.closest('button') || e.target.closest('input')) return;
 
-    // reset
+    // Store start coordinates
+    const touch = e.touches[0];
+    dragStartX = touch.clientX;
+    dragStartY = touch.clientY;
+
     clearTimeout(dragTimer);
     isDragging = false;
 
-    const el = document.getElementById(`list-item-${listId}`);
+    const el = document.getElementById(`item-${type}-${id}`);
     if (!el) return;
 
     dragTimer = setTimeout(() => {
@@ -246,36 +463,45 @@ function handleTouchStart(e, listId) {
         dragElement = el;
         el.classList.add('dragging');
         tg.HapticFeedback.impactOccurred('medium');
-
-        // Disable scrolling to prevent interference
         document.body.style.overflow = 'hidden';
-    }, 400); // 400ms long press
+    }, 400);
 }
 
-// Global touch handlers
 document.addEventListener('touchmove', function (e) {
-    if (!isDragging || !dragElement) {
-        clearTimeout(dragTimer); // If moved before timer triggers, it's a scroll
+    const touch = e.touches[0];
+
+    // Check if we are waiting for long press or already dragging
+    if (!isDragging) {
+        if (!dragTimer) return; // No timer active
+
+        // Calculate movement distance
+        const moveX = Math.abs(touch.clientX - dragStartX);
+        const moveY = Math.abs(touch.clientY - dragStartY);
+
+        // If moved significantly, cancel timer
+        if (moveX > 10 || moveY > 10) {
+            clearTimeout(dragTimer);
+            dragTimer = null;
+        }
+        // If small movement, do nothing (keep timer running)
         return;
     }
 
-    // Prevent default scroll behavior while dragging
+    // Is Dragging Logic
     if (e.cancelable) e.preventDefault();
+    if (!dragElement) return;
 
-    const touch = e.touches[0];
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
-
     if (!target) return;
 
+    // Find closest list-item
     const targetItem = target.closest('.list-item');
-    if (targetItem && targetItem !== dragElement) {
-        // Swap logic
-        const container = document.getElementById('lists-container');
+    if (targetItem && targetItem !== dragElement && targetItem.parentElement === dragElement.parentElement) {
+        const container = dragElement.parentElement;
         const children = [...container.children];
         const dragIndex = children.indexOf(dragElement);
         const targetIndex = children.indexOf(targetItem);
 
-        // Simple swap visual
         if (dragIndex < targetIndex) {
             container.insertBefore(dragElement, targetItem.nextSibling);
         } else {
@@ -286,7 +512,11 @@ document.addEventListener('touchmove', function (e) {
 }, { passive: false });
 
 document.addEventListener('touchend', function (e) {
-    clearTimeout(dragTimer);
+    // Always clear timer on lift
+    if (dragTimer) {
+        clearTimeout(dragTimer);
+        dragTimer = null;
+    }
 
     if (isDragging && dragElement) {
         isDragging = false;
@@ -294,267 +524,145 @@ document.addEventListener('touchend', function (e) {
         document.body.style.overflow = '';
 
         // Save new order
-        const newOrder = Array.from(document.querySelectorAll('.list-item'))
-            .map(el => parseInt(el.id.replace('list-item-', '')));
+        const items = [];
+        document.querySelectorAll('#all-container > div').forEach(el => {
+            // ID format item-{type}-{id}
+            const parts = el.id.split('-');
+            items.push({ type: parts[1], id: parseInt(parts[2]) });
+        });
 
-        apiRequest('/lists/reorder', 'POST', { user_id: userId, list_ids: newOrder });
+        apiRequest('/dashboard/reorder', 'POST', { user_id: userId, items: items });
         dragElement = null;
-
-        // Prevent immediate click (toggle)
         setTimeout(() => { wasDragging = false; }, 100);
     }
 });
 
-// Update toggleList to respect drag
-function toggleList(listId) {
-    if (wasDragging) {
-        return;
-    }
-    const el = document.getElementById(`list-item-${listId}`);
-    if (!el) return;
-    // ... rest is handled by restart of function or logic below
 
-    if (expandedLists.has(listId)) {
-        expandedLists.delete(listId);
-        el.classList.remove('expanded');
-    } else {
-        expandedLists.add(listId);
-        el.classList.add('expanded');
-    }
-}
-
-async function addTask() {
-    const input = document.getElementById('new-task-input');
-    const content = input.value.trim();
-    if (!content) return;
-
-    input.value = '';
-    // Optimistic UI could be added here
-
-    await apiRequest(`/tasks/${userId}/add`, 'POST', { content });
-    loadTasks();
-    tg.HapticFeedback.notificationOccurred('success');
-}
-
-async function toggleTask(taskId, currentStatus) {
-    // Visual feedback
-    tg.HapticFeedback.selectionChanged();
-    const endpoint = currentStatus === 'COMPLETED' ? 'uncomplete' : 'complete';
-    await apiRequest(`/tasks/${taskId}/${endpoint}`, 'POST', { user_id: userId });
-
-    // Refresh context
-    const activeTab = document.querySelector('.tab-btn.active');
-    if (activeTab && activeTab.textContent.includes('Listas')) {
-        loadLists();
-    } else {
-        loadTasks();
-    }
-}
-
-async function addList() {
-    const name = await showModal('Nueva Lista', 'Nombre de la lista:', true);
-    if (!name) return;
-
-    await apiRequest(`/lists/${userId}/add`, 'POST', { name });
-    loadLists();
-}
-
-async function deleteList(listId) {
-    const confirm = await showModal('Eliminar lista', '¿Seguro que quieres eliminar esta lista y sus tareas?');
-    if (!confirm) return;
-    await apiRequest(`/lists/${listId}/delete`, 'POST', { user_id: userId });
-    loadLists();
-}
-
-async function shareList(listId) {
-    const username = await showModal('Invitar Usuario', 'Introduce el @usuario, nombre o ID de Telegram:', true);
-    if (!username) return;
-    const res = await apiRequest(`/lists/${listId}/share`, 'POST', { username, user_id: userId });
-    if (res) alert(res.message);  // Keep alert for result message or use another Modal? Let's assume alert works or replace.
-    // Actually TG android supports alert usually. But let's be consistent.
-}
-
-async function leaveList(listId) {
-    if (!confirm("¿Salir de esta lista compartida?")) return;
-    const res = await apiRequest(`/lists/${listId}/leave`, 'POST', { user_id: userId });
-    if (res) loadLists();
-}
-
-async function loadInvites() {
-    const container = document.getElementById('invites-container');
-    if (!container) return; // Fail safe
-
-    // Only load if section exists in HTML
-    const invites = await apiRequest(`/invites/${userId}`);
-    if (!invites || invites.length === 0) {
-        container.style.display = 'none';
-        container.innerHTML = '';
-        return;
-    }
-
-    container.style.display = 'block';
-    container.innerHTML = '<h3>Invitaciones Pendientes <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></h3>';
-
-    invites.forEach(inv => {
-        const el = document.createElement('div');
-        el.className = 'invite-item';
-        el.innerHTML = `
-            <div><strong>${inv.list_name}</strong> de @${inv.owner_name}</div>
-            <div class="invite-actions">
-                <button onclick="respondInvite(${inv.list_id}, true)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
-                <button onclick="respondInvite(${inv.list_id}, false)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-        `;
-        container.appendChild(el);
-    });
-}
-
-async function respondInvite(listId, accept) {
-    await apiRequest(`/invites/${listId}/respond`, 'POST', { user_id: userId, accept });
-    loadInvites();
-    loadLists();
-}
-
-// Deprecated or alias
-async function completeTask(taskId) {
-    toggleTask(taskId, 'PENDING');
-}
-
-async function addTaskToList(listId) {
-    const input = document.getElementById(`add-list-task-${listId}`);
-    const content = input.value.trim();
-    if (!content) return;
-
-    input.value = '';
-    await apiRequest(`/tasks/${userId}/add`, 'POST', { content, list_id: listId });
-    loadLists(); // Refresh lists view specifically
-    tg.HapticFeedback.notificationOccurred('success');
-}
-
-async function editList(listId, btnElement) {
-    const currentName = btnElement.getAttribute('data-name');
-    const newName = await showModal('Renombrar Lista', 'Nuevo nombre:', true, currentName);
-
-    if (newName === null || newName.trim() === "") return;
-    if (newName.trim() === currentName) return;
-
-    await apiRequest(`/lists/${listId}/update`, 'POST', { name: newName, user_id: userId });
-    loadLists();
-}
-
-async function previewListColor(listId, color) {
-    const el = document.getElementById(`list-item-${listId}`);
-    if (el) {
-        el.style.backgroundColor = color;
-    }
-}
-
-async function saveListColor(listId, color) {
-    if (!color) return;
-    await apiRequest(`/lists/${listId}/color`, 'POST', { color: color, user_id: userId });
-    // Do NOT reload lists to keep UI state (and color picker) stable
-}
-
-async function editTask(taskId, btnElement) {
-    const currentContent = btnElement.getAttribute('data-content');
-    const newContent = await showModal('Editar Tarea', 'Contenido:', true, currentContent);
-
-    if (newContent === null || newContent.trim() === "") return;
-    if (newContent.trim() === currentContent) return; // No change
-
-    await apiRequest(`/tasks/${taskId}/update`, 'POST', { content: newContent, user_id: userId });
-
-    const activeTab = document.querySelector('.tab-btn.active');
-    if (activeTab && activeTab.textContent.includes('Tareas')) {
-        loadTasks();
-    } else {
-        loadLists();
-    }
-}
-
-async function deleteTask(taskId, isFromList = false) {
-    const confirm = await showModal('Eliminar Tarea', '¿Eliminar esta tarea?');
-    if (!confirm) return;
-    tg.HapticFeedback.notificationOccurred('warning');
-    await apiRequest(`/tasks/${taskId}/delete`, 'POST', { user_id: userId });
-
-    if (isFromList) {
-        loadLists();
-    } else {
-        const activeTab = document.querySelector('.tab-btn.active');
-        if (activeTab && activeTab.textContent.includes('Listas')) {
-            loadLists();
-        } else {
-            loadTasks();
-        }
-    }
-}
-
-// Modal Logic
+// Modal Helpers
 let modalResolver = null;
-
 function showModal(title, message, hasInput = false, initialValue = '') {
     return new Promise((resolve) => {
         document.getElementById('modal-title').innerText = title;
         document.getElementById('modal-message').innerText = message;
-
         const input = document.getElementById('modal-input');
-        if (hasInput) {
-            input.style.display = 'block';
-            input.value = initialValue;
-            setTimeout(() => input.focus(), 100);
-        } else {
-            input.style.display = 'none';
-        }
-
+        input.value = initialValue;
+        input.style.display = hasInput ? 'block' : 'none';
         document.getElementById('custom-modal').style.display = 'flex';
         modalResolver = resolve;
+        if (hasInput) setTimeout(() => input.focus(), 100);
     });
 }
-
 function closeModal(result) {
     const modal = document.getElementById('custom-modal');
-    const input = document.getElementById('modal-input');
-
     modal.style.display = 'none';
-
     if (modalResolver) {
-        if (result && input.style.display !== 'none') {
-            modalResolver(input.value);
-        } else {
-            modalResolver(result);
-        }
+        const input = document.getElementById('modal-input');
+        modalResolver((result && input.style.display !== 'none') ? input.value : result);
         modalResolver = null;
     }
 }
+// Expose global
+window.closeModal = closeModal;
+window.switchTab = switchTab;
+window.openAddTaskModal = openAddTaskModal;
+window.addList = addList;
+window.toggleTask = toggleTask;
+window.addTaskToList = addTaskToList;
+window.toggleListMixed = toggleListMixed;
+window.editList = editList;
+window.deleteList = deleteList;
+window.shareList = shareList;
+window.startReorderList = startReorderList;
+window.saveListColor = saveListColor;
+window.previewListColorMixed = previewListColorMixed;
+window.editTask = editTask;
+window.deleteTask = deleteTask;
+window.respondInvite = respondInvite;
 
-function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+function escapeAttr(str) { return str ? str.replace(/"/g, '&quot;') : ''; }
+async function loadInvites() {
+    const container = document.getElementById('invites-container');
+    const invites = await apiRequest(`/invites/${userId}`);
+    if (!invites || invites.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'block';
+    container.innerHTML = '<h3>Invitaciones</h3>';
+    invites.forEach(inv => {
+        const el = document.createElement('div');
+        el.className = 'invite-item';
+        el.innerHTML = `<div>${inv.list_name} (@${inv.owner_name})</div>
+        <div class="invite-actions">
+           <button onclick="respondInvite(${inv.list_id}, true)">✅</button>
+           <button onclick="respondInvite(${inv.list_id}, false)">❌</button>
+        </div>`;
+        container.appendChild(el);
+    });
+}
 
-    // Find button with matching onclick handler is hardish, just index?
-    // Let's use simple logic
-    // Use data attributes or simple indexing if classes were clean
-    // Fixing selector to be robust against quoting style
-    if (tab === 'tasks') {
-        const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.textContent.includes('Tareas'));
-        if (btn) btn.classList.add('active');
-        document.getElementById('tasks-view').classList.add('active');
-        loadTasks();
-    } else {
-        const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.textContent.includes('Listas'));
-        if (btn) btn.classList.add('active');
-        document.getElementById('lists-view').classList.add('active');
-        loadLists();
+
+
+// Helper for invite response
+async function respondInvite(listId, accept) {
+    try {
+        await apiRequest(`/invites/${listId}/respond`, 'POST', { user_id: userId, accept: accept });
+        loadInvites(); // Refresh invites
+        if (accept) loadAllView();
+    } catch (e) {
+        console.error("Error al responder invitación: " + e.message);
     }
 }
 
-// Initial Load
-if (userId) {
-    loadTasks();
-} else {
-    document.getElementById('tasks-container').innerHTML = '<div class="empty-state">Please open via Telegram Bot.</div>';
+// Ensure everything is loaded
+// Ensure everything is loaded
+// Safe Init
+function initApp(retries = 0) {
+    // Try to get userId if missing
+    if (!userId) {
+        userId = tg.initDataUnsafe?.user?.id;
+        if (!userId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            userId = urlParams.get('user_id');
+        }
+    }
+
+    if (userId) {
+        // Initialize TG but don't wait for it to render data
+        if (tg) {
+            try { tg.ready(); tg.expand(); } catch (e) { console.error(e); }
+        }
+
+        console.log("InitApp: Triggering dated view immediately");
+        switchTab('dated');
+
+    } else {
+        if (retries < 10) {
+            setTimeout(() => initApp(retries + 1), 200);
+        } else {
+            // Try one last time to get from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const fallbackId = urlParams.get('user_id');
+            if (fallbackId) {
+                userId = fallbackId;
+                switchTab('dated');
+            } else {
+                console.error("No userId found after retries");
+                document.getElementById('dated-container').innerHTML = '<div class="empty-state">Error: Usuario no identificado.</div>';
+            }
+        }
+    }
 }
 
-// Main Button for adding task?
-// tg.MainButton.setText("Update").show().onClick(() => loadTasks());
+// Safe Init Trigger
+function triggerInit() {
+    initApp();
+}
+
+// Robust initialization trigger
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    triggerInit();
+} else {
+    window.addEventListener('load', triggerInit);
+    document.addEventListener('DOMContentLoaded', triggerInit);
+}

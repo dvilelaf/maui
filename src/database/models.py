@@ -38,24 +38,6 @@ class TaskList(BaseModel):
 # ... (rest of models)
 
 
-def create_tables():
-    real_db = db.obj
-    if real_db is None:
-        # Fallback to default if somehow missed (should not happen in main)
-        from peewee import SqliteDatabase
-
-        real_db = SqliteDatabase("maui.db")
-        db.initialize(real_db)
-
-    # Force bind to the underlying SqliteDatabase object, bypassing Proxy issues
-    real_db.bind([User, Task, TaskList, SharedAccess])
-
-    # Create tables using the real DB object
-    real_db.create_tables([User, Task, TaskList, SharedAccess])
-
-
-
-
 class SharedAccess(BaseModel):
     user = ForeignKeyField(User, backref="shared_lists")
     task_list = ForeignKeyField(TaskList, backref="members")
@@ -82,3 +64,34 @@ class Task(BaseModel):
     status = CharField(default=TaskStatus.PENDING)  # PENDING, COMPLETED, CANCELLED
     reminder_sent = BooleanField(default=False)
     task_list = ForeignKeyField(TaskList, backref="tasks", null=True)
+    position = IntegerField(default=0)
+
+
+def create_tables():
+    real_db = db.obj
+    if real_db is None:
+        # Fallback to default if somehow missed (should not happen in main)
+        from peewee import SqliteDatabase
+
+        real_db = SqliteDatabase("maui.db")
+        db.initialize(real_db)
+
+    # Force bind to the underlying SqliteDatabase object, bypassing Proxy issues
+    real_db.bind([User, Task, TaskList, SharedAccess])
+
+    # Create tables using the real DB object
+    real_db.create_tables([User, Task, TaskList, SharedAccess])
+
+    # Manual Migration checks
+    try:
+        from peewee import OperationalError
+
+        # Check Task.position
+        try:
+            real_db.execute_sql(
+                "ALTER TABLE task ADD COLUMN position INTEGER DEFAULT 0"
+            )
+        except OperationalError:
+            pass
+    except Exception as e:
+        print(f"Migration warning: {e}")

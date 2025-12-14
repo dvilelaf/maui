@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
-from peewee import fn
+from peewee import fn, JOIN
 import logging
 
 from src.database.core import db
@@ -38,6 +38,17 @@ class TaskManager:
         if existing:
             return None
 
+        # Determine position: Append to end of "loose tasks" for this user
+        new_pos = 0
+        if not target_list_id:
+            max_pos = (
+                Task.select(fn.MAX(Task.position))
+                .where((Task.user == user_id) & (Task.task_list.is_null()))
+                .scalar()
+                or 0
+            )
+            new_pos = max_pos + 1
+
         new_task = Task.create(
             user=user_id,
             title=task_data.title,
@@ -47,6 +58,7 @@ class TaskManager:
             status=TaskStatus.PENDING,
             created_at=datetime.now(),
             task_list=target_list_id,
+            position=new_pos,
         )
         logger.info(
             f"Task CREATED: ID={new_task.id} User={user_id} Title='{new_task.title}'"
@@ -725,9 +737,81 @@ class TaskManager:
         return results
 
     @staticmethod
+    def get_dashboard_items(user_id: int) -> List[dict]:
+        """Returns mixed Tasks and Lists for the 'All' / Todo tab."""
+        # 1. Get Tasks (loose tasks, no list)
+        tasks = list(
+            Task.select().where((Task.user == user_id) & (Task.task_list.is_null()))
+        )
+
+        # 2. Get Lists
+        lists = TaskManager.get_lists(user_id)
+
+        items = []
+        for t in tasks:
+            items.append(
+                {
+                    "type": "task",
+                    "data": t,
+                    "created_at": t.created_at,
+                    "position": t.position or 0,
+                }
+            )
+
+        for lst in lists:
+            items.append(
+                {
+                    "type": "list",
+                    "data": lst,
+                    "created_at": lst.created_at,
+                    "position": getattr(lst, "_sort_pos", 0) or 0,
+                }
+            )
+
+        # Sort by position, then created_at
+        # Normalizing positions might be tricky if they are on different scales,
+        # but the reorder logic will eventually unify them.
+        # Initial sort: Position primarily.
+        items.sort(key=lambda x: (x["position"], x["created_at"]))
+
+        return items
+
+    @staticmethod
+    def get_dated_items(user_id: int) -> List[Task]:
+        """Returns all tasks (loose or inside lists) that have a deadline."""
+        query = Task.deadline.is_null(False)
+
+        # Access control: Owned tasks OR tasks in lists user has access to
+        # A simple way is to check:
+        # 1. Owned by user
+        # 2. OR in a list where user is a member
+
+        # Subquery for shared list IDs
+        shared_list_ids = SharedAccess.select(SharedAccess.task_list).where(
+            (SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED")
+        )
+
+        # Tasks user owns directly
+        cond_owned = Task.user == user_id
+
+        # Tasks in shared lists (even if created by others)
+        cond_shared = Task.task_list.in_(shared_list_ids)
+
+        tasks = list(
+            Task.select(Task, TaskList)
+            .join(
+                TaskList, on=(Task.task_list == TaskList.id), join_type=JOIN.LEFT_OUTER
+            )
+            .where(query & (cond_owned | cond_shared))
+            .order_by(Task.deadline, Task.priority)
+        )
+
+        return tasks
+
+    @staticmethod
     def get_tasks_in_list(list_id: int) -> List[Task]:
         return list(
             Task.select()
             .where(Task.task_list == list_id)
-            .order_by(Task.status.desc(), Task.created_at)
+            .order_by(Task.status.asc(), Task.created_at)
         )

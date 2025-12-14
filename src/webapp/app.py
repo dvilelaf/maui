@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from src.utils.config import Config
 from src.database.core import db, init_db
 from src.database.models import create_tables
-from src.webapp.routers import tasks, lists, invites
+from src.webapp.routers import tasks, lists, invites, dashboard
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +47,7 @@ app.add_middleware(
 app.include_router(tasks.router)
 app.include_router(lists.router)
 app.include_router(invites.router)
+app.include_router(dashboard.router)
 
 # Serve Frontend - Must be last
 app.mount("/", StaticFiles(directory="src/webapp/static", html=True), name="static")

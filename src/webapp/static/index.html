@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Maui Tasks</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=39">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,38 +15,43 @@
 
 <body>
     <div id="app">
-
-
-        <nav class="tabs">
-            <button class="tab-btn active" onclick="switchTab('tasks')">Tareas</button>
-            <button class="tab-btn" onclick="switchTab('lists')">Listas</button>
-        </nav>
-
-        <main id="tasks-view" class="view active">
-            <div class="input-group">
-                <input type="text" id="new-task-input" placeholder="Añadir nueva tarea...">
-                <button id="add-task-btn" onclick="addTask()">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        <header>
+            <div class="global-actions">
+                <button class="action-btn" onclick="openAddTaskModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
+                    Tarea
+                </button>
+                <button class="action-btn" onclick="addList()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    Lista
                 </button>
             </div>
-            <div id="tasks-container" class="list-container">
-                <!-- Tasks injected here -->
+
+            <nav class="tabs">
+                <button class="tab-btn active" onclick="switchTab('dated')">Con fecha</button>
+                <button class="tab-btn" onclick="switchTab('all')">Todo</button>
+            </nav>
+        </header>
+
+        <main id="dated-view" class="view active">
+            <div id="dated-container" class="list-container">
+                <!-- Dated items injected here -->
+                <div class="empty-state">No hay tareas con fecha</div>
             </div>
         </main>
 
-        <main id="lists-view" class="view">
+        <main id="all-view" class="view">
             <div id="invites-container" style="display:none; margin-bottom: 20px;"></div>
-            <div class="input-group">
-                <button class="action-btn" onclick="addList()" style="width: 100%; justify-content: center;">
-                    + Nueva Lista
-                </button>
-            </div>
-            <div id="lists-container" class="list-container">
-                <!-- Lists injected here -->
+            <div id="all-container" class="list-container">
+                <!-- Mixed items injected here -->
             </div>
         </main>
     </div>
@@ -67,7 +72,7 @@
         </div>
     </div>
 
-    <script src="script.js?v=12"></script>
+    <script src="script.js?v=42"></script>
 </body>
 
 </html>
