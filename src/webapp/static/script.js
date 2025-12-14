@@ -507,6 +507,7 @@ let wasDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
 let dragElement = null;
+let lastSwapTime = 0; // Debounce for reordering
 
 function handleTouchStart(e, type, id) {
     if (e.target.closest('button') || e.target.closest('input')) return;
@@ -562,6 +563,10 @@ document.addEventListener('touchmove', function (e) {
     // Find closest list-item
     const targetItem = target.closest('.list-item');
     if (targetItem && targetItem !== dragElement && targetItem.parentElement === dragElement.parentElement) {
+        // Debounce swaps to prevent flickering
+        const now = Date.now();
+        if (now - lastSwapTime < 250) return;
+
         const container = dragElement.parentElement;
         const children = [...container.children];
         const dragIndex = children.indexOf(dragElement);
@@ -572,6 +577,7 @@ document.addEventListener('touchmove', function (e) {
         } else {
             container.insertBefore(dragElement, targetItem);
         }
+        lastSwapTime = now;
         tg.HapticFeedback.selectionChanged();
     }
 }, { passive: false });
@@ -583,24 +589,56 @@ document.addEventListener('touchend', function (e) {
         dragTimer = null;
     }
 
-    if (isDragging && dragElement) {
+    if (isDragging) {
+        console.log('[TouchEnd] Drag finished.');
+
+        // Calculate total movement to detect "Stationary Long Press"
+        const touch = e.changedTouches[0];
+        const endX = touch.clientX;
+        const endY = touch.clientY;
+        const dist = Math.sqrt(Math.pow(endX - dragStartX, 2) + Math.pow(endY - dragStartY, 2));
+
+        const wasStationary = dist < 10;
+        console.log(`[TouchEnd] Distance: ${dist.toFixed(1)}px. Stationary: ${wasStationary}`);
+
         isDragging = false;
-        dragElement.classList.remove('dragging');
+        if (dragElement) {
+            dragElement.classList.remove('dragging');
+            dragElement = null;
+        }
         document.body.style.overflow = '';
 
-        // Save new order
-        const items = [];
-        document.querySelectorAll('#all-container > div').forEach(el => {
-            // ID format item-{type}-{id}
-            const parts = el.id.split('-');
-            items.push({ type: parts[1], id: parseInt(parts[2]) });
-        });
+        if (wasStationary) {
+            // If we didn't move, treat it as a click (allow toggle)
+            // We reset wasDragging immediately so the click event (which comes next) works
+            console.log('[TouchEnd] Stationary lift -> Allowing click.');
+            wasDragging = false;
+        } else {
+            // We moved, so this was a real drag. Block the click.
+            // Save new order
+            const items = [];
+            document.querySelectorAll('#all-container > div').forEach(el => {
+                const idParts = el.id.split('-');
+                if (idParts.length >= 3) {
+                    items.push({ type: idParts[1], id: parseInt(idParts[2]) });
+                }
+            });
+            saveDashboardOrder(items);
 
-        apiRequest('/dashboard/reorder', 'POST', { user_id: userId, items: items });
-        dragElement = null;
-        setTimeout(() => { wasDragging = false; }, 100);
+            // Delay clearing wasDragging to block the click
+            setTimeout(() => {
+                console.log('[TouchEnd] Clearing wasDragging (block click expired).');
+                wasDragging = false;
+            }, 100);
+        }
+    } else {
+        wasDragging = false;
     }
 });
+
+async function saveDashboardOrder(items) {
+    await apiRequest('/dashboard/reorder', 'POST', { user_id: userId, items: items });
+}
 
 
 // Modal Helpers
