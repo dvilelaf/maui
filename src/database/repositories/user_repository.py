@@ -75,3 +75,17 @@ class UserManager:
         from src.database.models import UserStatus
 
         return list(User.select().where(User.status == UserStatus.PENDING))
+
+    def update_notification_time(self, telegram_id: int, new_time) -> bool:
+        """Update the daily notification time for a user."""
+        try:
+            user = User.get(User.telegram_id == telegram_id)
+            user.notification_time = new_time
+            user.save()
+            logger.info(f"Notification time updated: ID={telegram_id} -> {new_time}")
+            return True
+        except User.DoesNotExist:
+            logger.warning(
+                f"Attempted to update notification time for non-existent user {telegram_id}"
+            )
+            return False

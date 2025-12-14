@@ -88,6 +88,7 @@ class GeminiService(LLMProvider):
         - CREATE_LIST: Create a new list (e.g., "Create a shopping list", "New list called Project X").
         - SHARE_LIST: Share a list with someone (e.g., "Share shopping list with @juan").
         - DELETE_LIST: Delete a list (e.g., "Delete shopping list", "Elimina lista compra").
+        - CHANGE_NOTIFICATION_TIME: Change daily notification time (e.g. "Send daily summary at 8 PM", "Notificaciones a las 10:00").
         - UNKNOWN: Irrelevant input.
 
         **Language Support:**
@@ -97,6 +98,7 @@ class GeminiService(LLMProvider):
         - "Elimina tarea X" or "Borra tarea X" -> CANCEL_TASK.
         - "Agrega", "Nueva", "Pon" -> ADD_TASK.
         - "Que tengo", "Mis tareas", "Pendientes" -> QUERY_TASKS.
+        - "Cambiar hora notificaciones a las X" -> CHANGE_NOTIFICATION_TIME.
         - If "todas" or "everything", map to "ALL".
 
         Output matching the JSON schema:
@@ -119,6 +121,7 @@ class GeminiService(LLMProvider):
           - For EDIT_TASK: Changed fields only.
           - For CREATE_LIST: "title" is the name of the new list.
           - For SHARE_LIST: "shared_with" is a list of usernames mentioned (e.g. ["juan"]). "target_search_term" is the name of the list.
+          - For CHANGE_NOTIFICATION_TIME: Use "deadline" to store the desired time (date part ignored).
 
 
         If UNKNOWN, provide reasoning in Spanish.

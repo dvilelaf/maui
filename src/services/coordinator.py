@@ -225,6 +225,20 @@ class Coordinator:
                     "❌ No se pudo eliminar la lista. Asegúrate de ser el propietario."
                 )
 
+        if extraction.intent == UserIntent.CHANGE_NOTIFICATION_TIME:
+            if not extraction.formatted_task or not extraction.formatted_task.deadline:
+                return "⚠️ No he entendido a qué hora quieres recibir las notificaciones. Intenta decir: 'Notificaciones a las 8 PM'"
+
+            # Extract time part
+            new_time = extraction.formatted_task.deadline.time()
+
+            success = self.user_manager.update_notification_time(user_id, new_time)
+            if success:
+                time_str = new_time.strftime("%H:%M")
+                return f"✅ Hora de notificación actualizada a las *{time_str}*."
+            else:
+                return "❌ Hubo un error al actualizar tu hora de notificación."
+
         # Handle Task Modification Intents
         if extraction.intent in (
             UserIntent.CANCEL_TASK,
