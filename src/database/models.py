@@ -32,6 +32,7 @@ class TaskList(BaseModel):
     owner = ForeignKeyField(User, backref="owned_lists")
     created_at = DateTimeField(default=datetime.now)
     color = CharField(default="#f2f2f2")  # Light gray default
+    position = IntegerField(default=0)
 
 
 # ... (rest of models)
@@ -61,8 +62,22 @@ def create_tables():
                 "ALTER TABLE tasklist ADD COLUMN color VARCHAR(255) DEFAULT '#f2f2f2'"
             )
         except OperationalError:
-            # Column likely acts already
             pass
+
+        try:
+            real_db.execute_sql(
+                "ALTER TABLE tasklist ADD COLUMN position INTEGER DEFAULT 0"
+            )
+        except OperationalError:
+            pass
+
+        try:
+            real_db.execute_sql(
+                "ALTER TABLE sharedaccess ADD COLUMN position INTEGER DEFAULT 0"
+            )
+        except OperationalError:
+            pass
+
     except Exception as e:
         print(f"Migration warning: {e}")
 
@@ -72,6 +87,7 @@ class SharedAccess(BaseModel):
     task_list = ForeignKeyField(TaskList, backref="members")
     status = CharField(default="PENDING")  # PENDING, ACCEPTED
     joined_at = DateTimeField(default=datetime.now)
+    position = IntegerField(default=0)
 
 
 class Task(BaseModel):

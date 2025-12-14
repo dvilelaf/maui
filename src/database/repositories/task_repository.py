@@ -3,6 +3,7 @@ from typing import List, Optional
 from peewee import fn
 import logging
 
+from src.database.core import db
 from src.database.models import User, Task, TaskList, SharedAccess
 from src.utils.schema import TaskSchema, TimeFilter, TaskStatus
 from src.services.notification_service import notify_user
@@ -264,7 +265,24 @@ class TaskManager:
 
     @staticmethod
     def create_list(user_id: int, title: str) -> TaskList:
-        return TaskList.create(title=title, owner=user_id)
+        # Determine next position
+        max_pos_owned = (
+            TaskList.select(fn.MAX(TaskList.position))
+            .where(TaskList.owner == user_id)
+            .scalar()
+            or 0
+        )
+        max_pos_shared = (
+            SharedAccess.select(fn.MAX(SharedAccess.position))
+            .where(
+                (SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED")
+            )
+            .scalar()
+            or 0
+        )
+        next_pos = max(max_pos_owned, max_pos_shared) + 1
+
+        return TaskList.create(title=title, owner=user_id, position=next_pos)
 
     @staticmethod
     async def share_list(
@@ -393,6 +411,23 @@ class TaskManager:
 
         if accept:
             access.status = "ACCEPTED"
+
+            # Set position
+            max_pos_owned = (
+                TaskList.select(fn.MAX(TaskList.position))
+                .where(TaskList.owner == user.telegram_id)
+                .scalar()
+                or 0
+            )
+            max_pos_shared = (
+                SharedAccess.select(fn.MAX(SharedAccess.position))
+                .where(
+                    (SharedAccess.user == user.telegram_id) & (SharedAccess.status == "ACCEPTED")
+                )
+                .scalar()
+                or 0
+            )
+            access.position = max(max_pos_owned, max_pos_shared) + 1
             access.save()
 
             members = TaskManager.get_list_members(list_id)
@@ -529,14 +564,50 @@ class TaskManager:
     def get_lists(user_id: int) -> List[TaskList]:
         # Owned lists
         owned = list(TaskList.select().where(TaskList.owner == user_id))
+        for task_list in owned:
+            task_list._sort_pos = task_list.position
 
         # Shared lists
-        shared = list(
-            TaskList.select()
+        shared_query = (
+            TaskList.select(TaskList, SharedAccess.position.alias("sa_position"))
             .join(SharedAccess)
             .where((SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED"))
         )
-        return owned + shared
+        shared = []
+        for task_list in shared_query:
+            # Peewee aliases might be cleaner, but let's be explicit
+            # Access the position from shared access
+            task_list._sort_pos = task_list.sharedaccess.position
+            shared.append(task_list)
+
+        # Merge and sort
+        combined = owned + shared
+        combined.sort(key=lambda x: x._sort_pos)
+        return combined
+
+    @staticmethod
+    def reorder_lists(user_id: int, list_ids: List[int]) -> bool:
+        """Update positions for a list of list IDs."""
+        try:
+            with db.atomic():
+                for index, list_id in enumerate(list_ids):
+                    # Try update Owned
+                    res_owned = (
+                        TaskList.update(position=index)
+                        .where((TaskList.id == list_id) & (TaskList.owner == user_id))
+                        .execute()
+                    )
+
+                    if res_owned == 0:
+                        # Try update Shared
+                        SharedAccess.update(position=index).where(
+                            (SharedAccess.task_list == list_id)
+                            & (SharedAccess.user == user_id)
+                        ).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Error reordering lists: {e}")
+            return False
 
     @staticmethod
     def is_user_in_list(user_id: int, list_id: int) -> bool:

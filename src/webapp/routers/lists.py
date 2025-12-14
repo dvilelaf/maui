@@ -123,3 +123,16 @@ async def share_list(list_id: int, body: ShareRequest):
     if not success:
         raise HTTPException(status_code=400, detail=msg)
     return {"status": "success", "message": msg}
+
+
+class ReorderRequest(BaseModel):
+    user_id: int
+    list_ids: List[int]
+
+
+@router.post("/reorder")
+async def reorder_lists_endpoint(req: ReorderRequest):
+    success = coordinator.task_manager.reorder_lists(req.user_id, req.list_ids)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to reorder lists")
+    return {"status": "success"}

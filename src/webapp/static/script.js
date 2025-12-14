@@ -182,6 +182,7 @@ async function loadLists() {
         const el = document.createElement('div');
         el.className = `list-item ${isExpanded ? 'expanded' : ''}`;
         el.id = `list-item-${list.id}`;
+        el.ontouchstart = (e) => handleTouchStart(e, list.id);
         // Apply background color
         el.style.backgroundColor = list.color || '#f2f2f2';
 
@@ -222,9 +223,95 @@ async function loadLists() {
     });
 }
 
-function toggleList(listId) {
+// Drag and Drop Logic
+let dragTimer = null;
+let dragElement = null;
+let isDragging = false;
+let wasDragging = false; // To prevent click after drag
+
+function handleTouchStart(e, listId) {
+    if (e.target.closest('button') || e.target.closest('input')) return; // Ignore clicks on controls
+
+    // reset
+    clearTimeout(dragTimer);
+    isDragging = false;
+
     const el = document.getElementById(`list-item-${listId}`);
     if (!el) return;
+
+    dragTimer = setTimeout(() => {
+        isDragging = true;
+        wasDragging = true;
+        dragElement = el;
+        el.classList.add('dragging');
+        tg.HapticFeedback.impactOccurred('medium');
+
+        // Disable scrolling to prevent interference
+        document.body.style.overflow = 'hidden';
+    }, 400); // 400ms long press
+}
+
+// Global touch handlers
+document.addEventListener('touchmove', function (e) {
+    if (!isDragging || !dragElement) {
+        clearTimeout(dragTimer); // If moved before timer triggers, it's a scroll
+        return;
+    }
+
+    // Prevent default scroll behavior while dragging
+    if (e.cancelable) e.preventDefault();
+
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    if (!target) return;
+
+    const targetItem = target.closest('.list-item');
+    if (targetItem && targetItem !== dragElement) {
+        // Swap logic
+        const container = document.getElementById('lists-container');
+        const children = [...container.children];
+        const dragIndex = children.indexOf(dragElement);
+        const targetIndex = children.indexOf(targetItem);
+
+        // Simple swap visual
+        if (dragIndex < targetIndex) {
+            container.insertBefore(dragElement, targetItem.nextSibling);
+        } else {
+            container.insertBefore(dragElement, targetItem);
+        }
+        tg.HapticFeedback.selectionChanged();
+    }
+}, { passive: false });
+
+document.addEventListener('touchend', function (e) {
+    clearTimeout(dragTimer);
+
+    if (isDragging && dragElement) {
+        isDragging = false;
+        dragElement.classList.remove('dragging');
+        document.body.style.overflow = '';
+
+        // Save new order
+        const newOrder = Array.from(document.querySelectorAll('.list-item'))
+            .map(el => parseInt(el.id.replace('list-item-', '')));
+
+        apiRequest('/lists/reorder', 'POST', { user_id: userId, list_ids: newOrder });
+        dragElement = null;
+
+        // Prevent immediate click (toggle)
+        setTimeout(() => { wasDragging = false; }, 100);
+    }
+});
+
+// Update toggleList to respect drag
+function toggleList(listId) {
+    if (wasDragging) {
+        return;
+    }
+    const el = document.getElementById(`list-item-${listId}`);
+    if (!el) return;
+    // ... rest is handled by restart of function or logic below
 
     if (expandedLists.has(listId)) {
         expandedLists.delete(listId);
