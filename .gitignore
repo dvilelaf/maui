@@ -6,3 +6,5 @@ maui.db
 __pycache__/
 
 .coverage
+
+maui.db-journal

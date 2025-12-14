@@ -274,9 +274,7 @@ class TaskManager:
         )
         max_pos_shared = (
             SharedAccess.select(fn.MAX(SharedAccess.position))
-            .where(
-                (SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED")
-            )
+            .where((SharedAccess.user == user_id) & (SharedAccess.status == "ACCEPTED"))
             .scalar()
             or 0
         )
@@ -422,7 +420,8 @@ class TaskManager:
             max_pos_shared = (
                 SharedAccess.select(fn.MAX(SharedAccess.position))
                 .where(
-                    (SharedAccess.user == user.telegram_id) & (SharedAccess.status == "ACCEPTED")
+                    (SharedAccess.user == user.telegram_id)
+                    & (SharedAccess.status == "ACCEPTED")
                 )
                 .scalar()
                 or 0

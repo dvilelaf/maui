@@ -167,7 +167,8 @@ async function loadLists() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2.5 2.24 0 .46.62.8.8.8h3.48c1.67 0 3.04-1.36 3.04-3.02 0-1.34-2.5-1.52-2.5-2.24 0-.46.61-.8.8-.8z"/></svg>
                     <input type="color" value="${list.color || '#f2f2f2'}"
                         style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; padding:0; border:none; margin:0;"
-                        onchange="changeListColor(${list.id}, this.value)">
+                        oninput="previewListColor(${list.id}, this.value)"
+                        onchange="saveListColor(${list.id}, this.value)">
                 </div>
                 <button class="icon-btn" onclick="deleteList(${list.id}); event.stopPropagation();" style="color: #ff3b30;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -441,10 +442,17 @@ async function editList(listId, btnElement) {
     loadLists();
 }
 
-async function changeListColor(listId, color) {
+async function previewListColor(listId, color) {
+    const el = document.getElementById(`list-item-${listId}`);
+    if (el) {
+        el.style.backgroundColor = color;
+    }
+}
+
+async function saveListColor(listId, color) {
     if (!color) return;
     await apiRequest(`/lists/${listId}/color`, 'POST', { color: color, user_id: userId });
-    loadLists();
+    // Do NOT reload lists to keep UI state (and color picker) stable
 }
 
 async function editTask(taskId, btnElement) {
