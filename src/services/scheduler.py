@@ -2,7 +2,7 @@ from telegram.ext import ContextTypes
 import logging
 from src.database.repositories.task_repository import TaskManager
 from src.database.models import Task, User
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from src.utils.formatters import format_task_es
 from src.utils.schema import TimeFilter
 
@@ -72,6 +72,11 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
     )
 
     for task in upcoming_tasks:
+        # Skip if deadline is exactly midnight (00:00:00), assuming it's a date-only task
+        # These will be covered by the daily summary
+        if task.deadline.time() == time(0, 0, 0):
+            continue
+
         try:
             await context.bot.send_message(
                 chat_id=task.user.telegram_id,

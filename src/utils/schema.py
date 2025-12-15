@@ -73,6 +73,12 @@ class TaskSchema(BaseModel):
         None, description="Task status (PENDING, COMPLETED, CANCELLED)"
     )
 
+    @field_validator("deadline", mode="before")
+    def parse_deadline(cls, v):
+        if isinstance(v, str) and len(v) == 10:  # Simple check for YYYY-MM-DD
+            return f"{v}T23:59:59"
+        return v
+
     @field_validator("priority")
     def validate_priority(cls, v):
         if v is None:
