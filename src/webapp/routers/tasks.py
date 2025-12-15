@@ -107,12 +107,21 @@ class TaskUpdate(BaseModel):
     content: Optional[str] = None
     status: Optional[str] = None
     deadline: Optional[str] = None
+    recurrence: Optional[str] = None
     # user_id mixed in for backward compat if needed, but we prefer auth
     # user_id: int  <-- Removing this from strict requirement or ignoring it
 
     @field_validator("deadline")
     @classmethod
     def empty_string_to_none(cls, v: Optional[str]) -> Optional[str]:
+        if v == "":
+            return None
+        return v
+
+    @field_validator("recurrence")
+    @classmethod
+    def empty_recurrence_to_none(cls, v: Optional[str]) -> Optional[str]:
+        # Frontend sends "" for "No recurrence", we map to None
         if v == "":
             return None
         return v
@@ -133,31 +142,35 @@ async def update_task_content(
     task_id: int, update: TaskUpdate, user_id: int = Depends(get_current_user)
 ):
     # Check if there's anything to update
-    if update.content is not None or update.deadline is not None:
-        # Create schema with available fields
-        # Note: If deadline is passed as None explicitly, it clears the date?
-        # TaskUpdate(deadline: Optional[str] = None).
-        # If client sends null, it becomes None.
-        # Does TaskSchema handle None execution?
-        # We need to construct TaskSchema carefully.
+    # We now also check for recurrence
+    if update.content is not None or update.deadline is not None or update.recurrence is not None:
 
-        # We only pass title if it's present.
-        # TaskSchema expects 'title' if we want to change it?
-        # Actually TaskSchema is for CREATION usually, but edit_task likely uses it as DTO.
-
+        # We assume content (title) is the primary update, but others are optional.
         schema_kwargs = {}
         if update.content is not None:
             schema_kwargs["title"] = update.content
 
-        # To distinguish between "no change" and "clear date", we rely on the payload.
-        # If deadline is in update.model_dump(exclude_unset=True), we use it.
-        # But we are using Pydantic model object directly.
-        # Let's assume content is always sent by frontend "Edit" modal for now (it is).
-        # Deadline might be None (cleared) or String (set).
+        # Handle deadline and recurrence.
+        # Note: If deadline/recurrence is explicitly None (because frontend sent null?), it might be ignored if we use exclude_unset?
+        # But we are constructing TaskSchema manually.
+        # TaskSchema instantiation doesn't care about unset, it's just arguments.
 
-        schema_kwargs["deadline"] = update.deadline
+        # We rely on the fact that we ONLY call this if at least one field is not None (conceptually, though unset fields might be problematic if we don't distinguish).
+        # Actually, if frontend sends `deadline: null` or `deadline: ""`, Pydantic validator makes it None.
+        # If it sends nothing, it is None by default in TaskUpdate.
+        # How do we distinguish "Field Not Sent" vs "Field Sent as Null"?
+        # Pydantic's `update.model_dump(exclude_unset=True)` is the robust way.
 
-        schema = TaskSchema(**schema_kwargs)
+        update_dict = update.model_dump(exclude_unset=True)
+
+        # We need to map 'content' to 'title' for TaskSchema
+        if "content" in update_dict:
+            update_dict["title"] = update_dict.pop("content")
+
+        # TaskSchema expects keys matching its fields.
+        # We can pass **update_dict directly.
+
+        schema = TaskSchema(**update_dict)
 
         # Use user_id from Depends, ignore any body user_id
         success = coordinator.task_manager.edit_task(user_id, task_id, schema)

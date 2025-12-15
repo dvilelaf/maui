@@ -286,7 +286,7 @@ class TaskManager:
         if not updates:
             return False
 
-        allowed_fields = {"title", "description", "deadline", "priority", "status"}
+        allowed_fields = {"title", "description", "deadline", "priority", "status", "recurrence"}
 
         for k, v in updates.items():
             if k in allowed_fields:

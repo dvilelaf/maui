@@ -399,20 +399,48 @@ async function toggleListMixed(listId, headerElement) {
 
 // --- Add Task Modal Logic ---
 
-function openAddTaskModal(listId = null) {
+// --- Add/Edit Task Modal Logic ---
+
+function openTaskModal(taskId = null, listId = null, initialData = {}) {
     const modal = document.getElementById('add-task-modal');
+    const titleEl = document.getElementById('task-modal-title');
+    const taskIdInput = document.getElementById('new-task-id');
+    const listIdInput = document.getElementById('new-task-list-id');
+
     // Reset fields
     document.getElementById('new-task-title').value = '';
     document.getElementById('new-task-recurrence').value = '';
     const dateInput = document.getElementById('new-task-date');
     dateInput.value = '';
-    dateInput.type = 'text'; // Reset to text to show placeholder
+    dateInput.type = 'text';
 
-    // Set List ID
-    document.getElementById('new-task-list-id').value = listId || '';
+    taskIdInput.value = taskId || '';
+    listIdInput.value = listId || '';
+
+    if (taskId) {
+        // Edit Mode
+        titleEl.innerText = "Editar Tarea";
+        document.getElementById('new-task-title').value = initialData.content || '';
+        document.getElementById('new-task-recurrence').value = initialData.recurrence || '';
+        if (initialData.deadline) {
+            // Assume deadline format yyyy-MM-dd is usable by date input OR needs formatting
+            // API returns string usually. Input type=date expects yyyy-mm-dd
+            // If it contains T00:00:00, strip it
+            dateInput.value = initialData.deadline.split('T')[0];
+            dateInput.type = 'date';
+        }
+    } else {
+        // Create Mode
+        titleEl.innerText = "Nueva Tarea";
+    }
 
     modal.style.display = 'flex';
     document.getElementById('new-task-title').focus();
+}
+
+// Alias for old calls (add button) - defaults to create mode
+function openAddTaskModal(listId = null) {
+    openTaskModal(null, listId);
 }
 
 function closeAddTaskModal() {
@@ -426,36 +454,44 @@ async function submitNewTask() {
         return;
     }
 
+    const taskId = document.getElementById('new-task-id').value;
     const recurrence = document.getElementById('new-task-recurrence').value;
     let deadline = document.getElementById('new-task-date').value;
     const listId = document.getElementById('new-task-list-id').value;
 
-    // Build payload
     const payload = {
         content: title,
-        recurrence: recurrence || null,
-        deadline: deadline || null,
+        recurrence: recurrence || "", // Send empty string to clear if supported, or null
+        deadline: deadline || "",     // Send empty string to clear
         list_id: listId ? parseInt(listId) : null
     };
 
     closeAddTaskModal();
 
-    // Optimistic UI? Or just refresh?
-    // Let's call API and then refresh.
     try {
-        await apiRequest('/tasks/add', 'POST', payload);
-        tg.HapticFeedback.notificationOccurred('success');
+        if (taskId) {
+            // Update Existing (recurrence support added to API)
+            // Make sure payload keys match TaskUpdate. list_id updates not supported here yet?
+            // TaskUpdate: content, status, deadline, recurrence
+            // We strip list_id for update if not needed or supported.
+            await apiRequest(`/tasks/${taskId}/update`, 'POST', {
+                content: payload.content,
+                deadline: payload.deadline,
+                recurrence: payload.recurrence
+            });
+        } else {
+            // Create New
+            await apiRequest('/tasks/add', 'POST', payload);
+        }
 
-        // Refresh appropriate view
-        // If we added to a list, we MUST refresh that list to show the item.
-        // refreshCurrentView handles this by reloading the whole structure.
-        // Optimally, we would just reload the list, but full refresh is safer.
+        tg.HapticFeedback.notificationOccurred('success');
         refreshCurrentView();
 
     } catch (e) {
         alert("Error al guardar tarea: " + e.message);
     }
 }
+
 
 // Old method for reference (replaced by separate modal functions above)
 /*
@@ -500,19 +536,13 @@ async function addList() {
 async function editTask(taskId, btnElement) {
     const currentContent = btnElement.getAttribute('data-content');
     const currentDeadline = btnElement.getAttribute('data-deadline') || '';
+    const currentRecurrence = btnElement.getAttribute('data-recurrence') || '';
 
-    // Pass hasDate=true and hasInput=true
-    // showModal signature: (title, message, hasInput, initialValue, hasDate, initialDate)
-    const result = await showModal('Editar', 'Texto:', true, currentContent, true, currentDeadline);
-
-    // result is { content, deadline } if hasDate is true
-    if (result && result.content && result.content.trim() !== "") {
-        await apiRequest(`/tasks/${taskId}/update`, 'POST', {
-            content: result.content,
-            deadline: result.deadline
-        }); // Auth header handles user identification
-        refreshCurrentView();
-    }
+    openTaskModal(taskId, null, {
+        content: currentContent,
+        deadline: currentDeadline,
+        recurrence: currentRecurrence
+    });
 }
 
 // async function deleteTask(taskId, isFromList = false) {
@@ -882,27 +912,36 @@ function getTaskInnerHtml(task) {
     const deadlineHtml = task.deadline ? `<div class="task-deadline">${formatDeadline(task.deadline)}</div>` : '';
     // Determine completed class based on task status
     const isCompleted = task.status === 'COMPLETED';
-    const statusClass = isCompleted ? 'checked' : '';
+    const escapedContent = escapeAttr(task.content);
+    const deadline = task.deadline || "";
+    const recurrence = task.recurrence || "";
 
-    // Handle property differences if any (backend vs frontend objects sometimes differ, but we normalize here)
-    // Actually, we should assume standard structure or handle fallbacks
-    const title = task.title || task.content || '';
-    const escapedTitle = escapeAttr(title);
-
-    // Note: The wrapper (.task-item or .list-item) is created by the caller.
-    // This function returns the INNER content.
+    // Recurrence Icon Indicator if set
+    let recurrenceIcon = "";
+    if (recurrence && recurrence !== "None") {
+        recurrenceIcon = `<span style="font-size:12px; margin-left:4px; color:var(--tg-theme-link-color);" title="Repite: ${recurrence}">↻</span>`;
+    }
 
     return `
-        <div class="task-checkbox ${statusClass}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
+        <div class="checkbox ${isCompleted ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
         <div class="task-content">
-            <div class="task-title">${title}</div>
-            ${deadlineHtml}
+            <span class="${isCompleted ? 'completed-text' : ''}">${task.content} ${recurrenceIcon}</span>
+            ${task.deadline ? `<span class="deadline-text">${formatDeadline(task.deadline)}</span>` : ''}
         </div>
-        <button class="icon-btn edit-btn" data-content="${escapedTitle}" data-deadline="${task.deadline || ''}" onclick="editTask(${task.id}, this); event.stopPropagation();">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        <button class="icon-btn edit-btn"
+            data-content="${escapedContent}"
+            data-deadline="${deadline}"
+            data-recurrence="${recurrence}"
+            onclick="editTask(${task.id}, this); event.stopPropagation();">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+            </svg>
         </button>
-        <button class="delete-btn" onclick="deleteTask(${task.id}, true); event.stopPropagation();">
-             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+        <button class="icon-btn delete-btn" onclick="deleteTask(${task.id}); event.stopPropagation();">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path>
+            </svg>
         </button>
     `;
 }
