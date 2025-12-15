@@ -204,6 +204,42 @@ header h1 {
     border-color: var(--tg-theme-link-color);
 }
 
+/* List Add Button */
+.list-add-area {
+    margin-top: 10px;
+    padding: 0 4px;
+    text-align: center;
+    /* Helper for inline-block centering if needed */
+}
+
+.list-add-btn {
+    width: auto;
+    min-width: 50%;
+    /* Nice minimum width */
+    max-width: 80%;
+    margin: 0 auto;
+    /* Center horizontally */
+    background-color: var(--tg-theme-button-color) !important;
+    color: var(--tg-theme-button-text-color) !important;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 16px;
+    /* Fino */
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, opacity 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* Subtle depth like main button */
+}
+
+.list-add-btn:active {
+    opacity: 0.8;
+}
+
 #add-task-btn {
     background-color: var(--tg-theme-button-color);
     color: var(--tg-theme-button-text-color);

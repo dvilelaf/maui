@@ -172,7 +172,11 @@ class TaskManager:
         if not TaskManager._check_task_access(user_id, task):
             return False
 
-        if status == TaskStatus.COMPLETED and task.recurrence and task.status != TaskStatus.COMPLETED:
+        if (
+            status == TaskStatus.COMPLETED
+            and task.recurrence
+            and task.status != TaskStatus.COMPLETED
+        ):
             # Handle Recurrence: Spawn new task
             try:
                 # Calculate next deadline
@@ -187,6 +191,7 @@ class TaskManager:
                     next_date = base_date + timedelta(weeks=1)
                 elif task.recurrence == "MONTHLY":
                     import calendar
+
                     # Add 1 month preserving day
                     month = base_date.month - 1 + 1
                     year = base_date.year + month // 12
@@ -213,9 +218,11 @@ class TaskManager:
                         recurrence=task.recurrence,
                         task_list=task.task_list,
                         # We append to end of list or similar pos
-                        position=task.position + 1 if task.position else 0
+                        position=task.position + 1 if task.position else 0,
                     )
-                    logger.info(f"Recurring Task Spawned: {next_task.id} for {next_date}")
+                    logger.info(
+                        f"Recurring Task Spawned: {next_task.id} for {next_date}"
+                    )
             except Exception as e:
                 logger.error(f"Failed to spawn recurring task: {e}")
 

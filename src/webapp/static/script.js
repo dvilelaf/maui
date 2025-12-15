@@ -344,13 +344,12 @@ function renderListTasks(listId, tasks) {
                 </div>
             `}).join('')}
         </div>
-        <div class="list-add-task">
-            <input type="text" id="add-list-task-${listId}" placeholder="Añadir a lista..." onkeypress="if(event.key === 'Enter') addTaskToList(${listId})">
-            <input type="text" id="add-list-date-${listId}" placeholder="Fecha"
-                   onfocus="(this.type='date'); this.click()"
-                   onblur="(this.value ? this.type='date' : this.type='text')"
-                   style="width: 80px; padding: 8px; font-size: 14px; border-radius: 8px; border: 1px solid var(--tg-theme-hint-color); background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); margin-left: 4px;">
-            <button onclick="addTaskToList(${listId})">+</button>
+        </div>
+        <div class="list-add-area">
+             <button class="list-add-btn" onclick="openAddTaskModal(${listId})">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                 Añadir tarea
+             </button>
         </div>
      `;
 }
@@ -400,7 +399,7 @@ async function toggleListMixed(listId, headerElement) {
 
 // --- Add Task Modal Logic ---
 
-function openAddTaskModal() {
+function openAddTaskModal(listId = null) {
     const modal = document.getElementById('add-task-modal');
     // Reset fields
     document.getElementById('new-task-title').value = '';
@@ -409,7 +408,8 @@ function openAddTaskModal() {
     dateInput.value = '';
     dateInput.type = 'text'; // Reset to text to show placeholder
 
-    // Default to today if appropriate? No, let user choose.
+    // Set List ID
+    document.getElementById('new-task-list-id').value = listId || '';
 
     modal.style.display = 'flex';
     document.getElementById('new-task-title').focus();
@@ -428,12 +428,14 @@ async function submitNewTask() {
 
     const recurrence = document.getElementById('new-task-recurrence').value;
     let deadline = document.getElementById('new-task-date').value;
+    const listId = document.getElementById('new-task-list-id').value;
 
     // Build payload
     const payload = {
         content: title,
         recurrence: recurrence || null,
-        deadline: deadline || null // API handles empty string, but null is safer
+        deadline: deadline || null,
+        list_id: listId ? parseInt(listId) : null
     };
 
     closeAddTaskModal();
@@ -445,12 +447,9 @@ async function submitNewTask() {
         tg.HapticFeedback.notificationOccurred('success');
 
         // Refresh appropriate view
-        if (deadline) {
-            // Probably should go to Dated view or refresh it?
-            // If we are in 'dated' tab, refresh.
-            // If we are in 'all' tab, it might appear in loose tasks.
-            // Safe bet: refresh current view.
-        }
+        // If we added to a list, we MUST refresh that list to show the item.
+        // refreshCurrentView handles this by reloading the whole structure.
+        // Optimally, we would just reload the list, but full refresh is safer.
         refreshCurrentView();
 
     } catch (e) {
