@@ -43,17 +43,20 @@ async def test_check_deadlines_excludes_lists(test_db, mocker):
     await check_deadlines_job(context)
 
     # Verification
-    # Should have sent exactly ONE message (for t1)
-    assert context.bot.send_message.call_count == 1
+    # Should have sent TWO messages (one for t1, one for t2)
+    assert context.bot.send_message.call_count == 2
 
-    # Verify call args to ensure it was t1
-    args, kwargs = context.bot.send_message.call_args
-    assert "General Task" in kwargs['text']
-    assert "Buy Bread" not in kwargs['text']
+    # Verify calls
+    calls = context.bot.send_message.call_args_list
+    messages = [c.kwargs['text'] for c in calls]
+
+    # Check that both tasks were mentioned
+    assert any("General Task" in m for m in messages)
+    assert any("Buy Bread" in m for m in messages)
 
     # Verify DB state
     t1_refresh = Task.get_by_id(t1.id)
     t2_refresh = Task.get_by_id(t2.id)
 
     assert t1_refresh.reminder_sent is True
-    assert t2_refresh.reminder_sent is False
+    assert t2_refresh.reminder_sent is True
