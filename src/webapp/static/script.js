@@ -280,7 +280,7 @@ async function createDashboardElement(item) {
         el.style.backgroundColor = list.color || '#f2f2f2';
 
         el.innerHTML = `
-            <div class="list-header" onclick="toggleListMixed(${list.id})">
+            <div class="list-header" onclick="toggleListMixed(${list.id}, this)">
                 <div class="list-header-content">
                     <svg class="list-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     <div><strong>${list.title}</strong> <small>(${list.task_count})</small></div>
@@ -345,22 +345,43 @@ function renderListTasks(listId, tasks) {
      `;
 }
 
-async function toggleListMixed(listId) {
+async function toggleListMixed(listId, headerElement) {
     if (wasDragging) {
         console.log("Toggle blocked by wasDragging");
         return;
     }
-    const el = document.getElementById(`item-list-${listId}`); // Using new ID format
+
+    // Robust element finding: use passed element's parent, or fallback to ID
+    let el = null;
+    if (headerElement) {
+        el = headerElement.parentElement;
+    } else {
+        el = document.getElementById(`item-list-${listId}`);
+    }
+
     console.log(`Toggling list ${listId}, el found: ${!!el}`);
     if (!el) return;
 
     if (expandedLists.has(listId)) {
         expandedLists.delete(listId);
         el.classList.remove('expanded');
+        const body = el.querySelector('.list-body');
+        if (body) body.style.display = '';
     } else {
         expandedLists.add(listId);
         el.classList.add('expanded');
-        loadListTasksIntoBody(listId);
+        try {
+            await loadListTasksIntoBody(listId);
+        } catch (e) {
+            console.error(`Failed to load list ${listId}:`, e);
+            // Optionally remove expanded state if load fails?
+            // expandedLists.delete(listId);
+            // el.classList.remove('expanded');
+            // For now, just alert user so they know why it's empty
+            // alert("No se pudieron cargar las tareas. Revisa tu conexión.");
+            const body = document.getElementById(`list-body-${listId}`);
+            if (body) body.innerHTML = '<div class="empty-state" style="color:red">Error loading details.</div>';
+        }
     }
 }
 
@@ -512,13 +533,17 @@ let lastSwapTime = 0; // Debounce for reordering
 function handleTouchStart(e, type, id) {
     if (e.target.closest('button') || e.target.closest('input')) return;
 
+    // Always reset wasDragging on new touch to prevent stuck state
+    wasDragging = false;
+
     // Store start coordinates
     const touch = e.touches[0];
     dragStartX = touch.clientX;
     dragStartY = touch.clientY;
 
-    clearTimeout(dragTimer);
+    // Double check cleanup
     isDragging = false;
+    if (dragTimer) clearTimeout(dragTimer);
 
     const el = document.getElementById(`item-${type}-${id}`);
     if (!el) return;
@@ -578,9 +603,49 @@ document.addEventListener('touchmove', function (e) {
             container.insertBefore(dragElement, targetItem);
         }
         lastSwapTime = now;
+        lastSwapTime = now;
         tg.HapticFeedback.selectionChanged();
     }
 }, { passive: false });
+
+// Helper to reset drag state completely
+function forceResetDrag() {
+    isDragging = false;
+    wasDragging = false;
+    if (dragElement) {
+        dragElement.classList.remove('dragging');
+        dragElement = null;
+    }
+    if (dragTimer) {
+        clearTimeout(dragTimer);
+        dragTimer = null;
+    }
+    document.body.style.overflow = '';
+}
+
+// Helper to cleanup drag state
+function cleanupDragState() {
+    if (dragTimer) {
+        clearTimeout(dragTimer);
+        dragTimer = null;
+    }
+    if (isDragging) {
+        isDragging = false;
+        if (dragElement) {
+            dragElement.classList.remove('dragging');
+            dragElement = null;
+        }
+        document.body.style.overflow = '';
+    }
+    // Note: wasDragging logic blocking clicks is handled specifically in touchend
+    // For cancel/cleanup, we typically just want to reset everything.
+}
+
+document.addEventListener('touchcancel', function (e) {
+    console.log('[TouchCancel] Drag cancelled.');
+    cleanupDragState();
+    wasDragging = false;
+});
 
 document.addEventListener('touchend', function (e) {
     // Always clear timer on lift
