@@ -62,6 +62,7 @@ class Task(BaseModel):
     created_at = DateTimeField(default=datetime.now)
     deadline = DateTimeField(null=True)
     status = CharField(default=TaskStatus.PENDING)  # PENDING, COMPLETED, CANCELLED
+    recurrence = CharField(null=True)  # DAILY, WEEKLY, MONTHLY, YEARLY
     reminder_sent = BooleanField(default=False)
     task_list = ForeignKeyField(TaskList, backref="tasks", null=True)
     position = IntegerField(default=0)

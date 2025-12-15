@@ -13,6 +13,7 @@ class TaskCreate(BaseModel):
     content: str
     list_id: Optional[int] = None
     deadline: Optional[str] = None
+    recurrence: Optional[str] = None
 
     @field_validator("deadline")
     @classmethod
@@ -56,6 +57,7 @@ async def add_task(task: TaskCreate, user_id: int = Depends(get_current_user)):
         priority="MEDIUM",
         deadline=task.deadline,
         list_name=None,
+        recurrence=task.recurrence,
     )
 
     new_task = coordinator.task_manager.add_task(user_id=user_id, task_data=schema)

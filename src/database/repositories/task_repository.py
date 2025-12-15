@@ -56,6 +56,7 @@ class TaskManager:
             priority=task_data.priority,
             deadline=task_data.deadline,
             status=TaskStatus.PENDING,
+            recurrence=task_data.recurrence,
             created_at=datetime.now(),
             task_list=target_list_id,
             position=new_pos,
@@ -170,6 +171,53 @@ class TaskManager:
 
         if not TaskManager._check_task_access(user_id, task):
             return False
+
+        if status == TaskStatus.COMPLETED and task.recurrence and task.status != TaskStatus.COMPLETED:
+            # Handle Recurrence: Spawn new task
+            try:
+                # Calculate next deadline
+                # If no deadline, recurrence is meaningless? Or maybe just reminder?
+                # Assume deadline exists if recurrence is set, or default to created_at + interval
+                base_date = task.deadline if task.deadline else datetime.now()
+                next_date = None
+
+                if task.recurrence == "DAILY":
+                    next_date = base_date + timedelta(days=1)
+                elif task.recurrence == "WEEKLY":
+                    next_date = base_date + timedelta(weeks=1)
+                elif task.recurrence == "MONTHLY":
+                    import calendar
+                    # Add 1 month preserving day
+                    month = base_date.month - 1 + 1
+                    year = base_date.year + month // 12
+                    month = month % 12 + 1
+                    day = min(base_date.day, calendar.monthrange(year, month)[1])
+                    next_date = base_date.replace(year=year, month=month, day=day)
+                elif task.recurrence == "YEARLY":
+                    # Add 1 year
+                    try:
+                        next_date = base_date.replace(year=base_date.year + 1)
+                    except ValueError:
+                        # Handle leap year (Feb 29 -> Feb 28)
+                        next_date = base_date.replace(year=base_date.year + 1, day=28)
+
+                if next_date:
+                    # Create the next task
+                    next_task = Task.create(
+                        user=task.user,
+                        title=task.title,
+                        description=task.description,
+                        priority=task.priority,
+                        deadline=next_date,
+                        status=TaskStatus.PENDING,
+                        recurrence=task.recurrence,
+                        task_list=task.task_list,
+                        # We append to end of list or similar pos
+                        position=task.position + 1 if task.position else 0
+                    )
+                    logger.info(f"Recurring Task Spawned: {next_task.id} for {next_date}")
+            except Exception as e:
+                logger.error(f"Failed to spawn recurring task: {e}")
 
         task.status = status
         return task.save() > 0

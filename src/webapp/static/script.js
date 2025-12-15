@@ -398,15 +398,72 @@ async function toggleListMixed(listId, headerElement) {
 
 // --- ACTIONS ---
 
-async function openAddTaskModal() {
-    // Pass true for hasDate
-    const result = await showModal('Nueva Tarea', '¿Qué tienes que hacer? (Opcional: Fecha)', true, '', true);
-    if (!result || !result.content) return;
+// --- Add Task Modal Logic ---
 
-    // Result is { content, deadline }
-    await apiRequest(`/tasks/add`, 'POST', { content: result.content, deadline: result.deadline });
-    refreshCurrentView();
+function openAddTaskModal() {
+    const modal = document.getElementById('add-task-modal');
+    // Reset fields
+    document.getElementById('new-task-title').value = '';
+    document.getElementById('new-task-recurrence').value = '';
+    const dateInput = document.getElementById('new-task-date');
+    dateInput.value = '';
+    dateInput.type = 'text'; // Reset to text to show placeholder
+
+    // Default to today if appropriate? No, let user choose.
+
+    modal.style.display = 'flex';
+    document.getElementById('new-task-title').focus();
 }
+
+function closeAddTaskModal() {
+    document.getElementById('add-task-modal').style.display = 'none';
+}
+
+async function submitNewTask() {
+    const title = document.getElementById('new-task-title').value.trim();
+    if (!title) {
+        alert("Por favor escribe un título para la tarea.");
+        return;
+    }
+
+    const recurrence = document.getElementById('new-task-recurrence').value;
+    let deadline = document.getElementById('new-task-date').value;
+
+    // Build payload
+    const payload = {
+        content: title,
+        recurrence: recurrence || null,
+        deadline: deadline || null // API handles empty string, but null is safer
+    };
+
+    closeAddTaskModal();
+
+    // Optimistic UI? Or just refresh?
+    // Let's call API and then refresh.
+    try {
+        await apiRequest('/tasks/add', 'POST', payload);
+        tg.HapticFeedback.notificationOccurred('success');
+
+        // Refresh appropriate view
+        if (deadline) {
+            // Probably should go to Dated view or refresh it?
+            // If we are in 'dated' tab, refresh.
+            // If we are in 'all' tab, it might appear in loose tasks.
+            // Safe bet: refresh current view.
+        }
+        refreshCurrentView();
+
+    } catch (e) {
+        alert("Error al guardar tarea: " + e.message);
+    }
+}
+
+// Old method for reference (replaced by separate modal functions above)
+/*
+async function openAddTaskModal() {
+    // ...
+}
+*/
 
 function refreshCurrentView() {
     if (document.getElementById('dated-view').classList.contains('active')) loadDatedView();

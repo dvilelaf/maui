@@ -72,6 +72,9 @@ class TaskSchema(BaseModel):
     status: Optional[str] = Field(
         None, description="Task status (PENDING, COMPLETED, CANCELLED)"
     )
+    recurrence: Optional[str] = Field(
+        None, description="Recurrence pattern: DAILY, WEEKLY, MONTHLY, YEARLY"
+    )
 
     @field_validator("deadline", mode="before")
     def parse_deadline(cls, v):
