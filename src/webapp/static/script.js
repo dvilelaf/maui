@@ -945,7 +945,8 @@ function getTaskInnerHtml(task) {
     const deadlineHtml = task.deadline ? `<div class="task-deadline">${formatDeadline(task.deadline)}</div>` : '';
     // Determine completed class based on task status
     const isCompleted = task.status === 'COMPLETED';
-    const escapedContent = escapeAttr(task.content);
+    const displayContent = task.content || task.title || "Tarea sin nombre";
+    const escapedContent = escapeAttr(displayContent);
     const deadline = task.deadline || "";
     const recurrence = task.recurrence || "";
 
@@ -959,7 +960,7 @@ function getTaskInnerHtml(task) {
     return `
         <div class="task-checkbox ${isCompleted ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
         <div class="task-content">
-            <span class="${isCompleted ? 'completed-text' : ''}">${task.content} ${recurrenceIcon}</span>
+            <span class="${isCompleted ? 'completed-text' : ''}">${displayContent} ${recurrenceIcon}</span>
             ${task.deadline ? `<span class="deadline-text">${formatDeadline(task.deadline)}</span>` : ''}
         </div>
         <button class="icon-btn edit-btn"
