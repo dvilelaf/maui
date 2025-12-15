@@ -327,31 +327,34 @@ function renderListTasks(listId, tasks) {
     const body = document.getElementById(`list-body-${listId}`);
     if (!body) return;
 
-    // Sort: Pending first, Completed last
-    const sortedTasks = [...tasks].sort((a, b) => {
-        const isA = a.status === 'COMPLETED';
-        const isB = b.status === 'COMPLETED';
-        if (isA === isB) return 0; // Keep original order
-        return isA ? 1 : -1;
-    });
+    // Split tasks
+    const pendingTasks = tasks.filter(t => t.status !== 'COMPLETED');
+    const completedTasks = tasks.filter(t => t.status === 'COMPLETED');
 
-    body.innerHTML = `
-        <div class="list-tasks" style="display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0;">
-            ${sortedTasks.map(t => {
-        return `
-                <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}" style="width: 100%; margin: 0; border: none; background: rgba(255,255,255,0.6); box-shadow: none; border-radius: 8px;">
-                    ${getTaskInnerHtml(t)}
-                </div>
-            `}).join('')}
-        </div>
-        </div>
-        <div class="list-add-area">
+    // Button HTML
+    const addButtonHtml = `
+        <div class="list-add-area" style="margin: 8px 0; padding: 0 4px; text-align: center;">
              <button class="list-add-btn" onclick="openAddTaskModal(${listId})">
                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                  Añadir tarea
              </button>
         </div>
-     `;
+    `;
+
+    // Render logic
+    const renderTask = (t) => `
+        <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}" style="width: 100%; margin: 0; border: none; background: rgba(255,255,255,0.6); box-shadow: none; border-radius: 8px;">
+            ${getTaskInnerHtml(t)}
+        </div>
+    `;
+
+    body.innerHTML = `
+        <div class="list-tasks" style="display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0;">
+            ${pendingTasks.map(renderTask).join('')}
+            ${addButtonHtml}
+            ${completedTasks.map(renderTask).join('')}
+        </div>
+    `;
 }
 
 async function toggleListMixed(listId, headerElement) {
