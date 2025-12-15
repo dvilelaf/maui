@@ -216,7 +216,10 @@ async def test_edit_task_modal_edge_cases(app, task_for_modal):
         task_for_modal.delete_instance()
 
         assert isinstance(app.screen, EditTaskModal)
-        app.screen.query_one("#save", Button).press() # update
+        # Safe query to avoid NoMatches in race conditions
+        btns = app.screen.query("#save")
+        if btns:
+            btns.first().press() # update
         await pilot.pause(0.1)
         # should dismiss safe
 

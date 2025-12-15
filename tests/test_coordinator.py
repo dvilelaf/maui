@@ -435,7 +435,8 @@ async def test_edit_task_no_target(coordinator, mocker):
 def test_get_lists_summary(coordinator, mocker):
     # Empty
     mocker.patch.object(coordinator.task_manager, "get_lists", return_value=[])
-    assert "No tienes listas" in coordinator.get_lists_summary(123)
+    # New behavior: hints at creation instead of just saying "No lists"
+    assert "/create_list" in coordinator.get_lists_summary(123)
 
     # With lists
     l1 = MagicMock(title="L1", owner=MagicMock(telegram_id=123))
@@ -446,6 +447,31 @@ def test_get_lists_summary(coordinator, mocker):
     assert "L1" in resp
     assert "5 elementos" in resp
     assert "Propietario" in resp
+
+@pytest.mark.asyncio
+async def test_handle_edit_task_with_list_scope(coordinator, mocker):
+    """Cover lines 281-285 in coordinator.py: find task scoped to list"""
+    mocker.patch.object(coordinator.user_manager, "get_or_create_user", return_value=MagicMock(status=UserStatus.WHITELISTED))
+
+    # Setup list and task
+    mock_list = MagicMock(id=99, title="ScopeList")
+    mocker.patch.object(coordinator.task_manager, "find_list_by_name", return_value=mock_list)
+
+    mock_task = MagicMock(id=1, title="T")
+    mocker.patch.object(coordinator.task_manager, "find_tasks_by_keyword", return_value=[mock_task])
+    mocker.patch.object(coordinator.task_manager, "edit_task", return_value=True)
+
+    extract = TaskExtractionResponse(
+        intent=UserIntent.EDIT_TASK,
+        is_relevant=True,
+        target_search_term="T",
+        formatted_task=TaskSchema(list_name="ScopeList", title="NewT")
+    )
+
+    await coordinator.handle_message(123, "u", "txt", extractions=[extract])
+
+    # Verify find_tasks was called with list_id=99
+    coordinator.task_manager.find_tasks_by_keyword.assert_called_with(123, "T", list_id=99)
 
 @pytest.mark.asyncio
 async def test_cancel_all_zero(coordinator, mocker):
