@@ -73,10 +73,7 @@ class Settings(BaseSettings):
         users = self.WHITELISTED_USERS_RAW
         if not users:
             return []
-        try:
-            return [int(u.strip()) for u in users.split(",") if u.strip().isnumeric()]
-        except ValueError:
-            return []
+        return [int(u.strip()) for u in users.split(",") if u.strip().isnumeric()]
 
     @computed_field
     @property
