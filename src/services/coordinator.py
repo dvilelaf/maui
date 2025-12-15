@@ -17,6 +17,7 @@ from src.utils.formatters import (
     format_list_created,
     format_list_not_found,
     format_list_empty,
+    format_share_result,
     format_task_added,
     format_task_deleted,
     format_task_completed,
@@ -130,6 +131,7 @@ class Coordinator:
                 success, msg = await self.task_manager.share_list(
                     user_id, target_list.id, username
                 )
+                results.append(format_share_result(success, msg))
             return "\n".join(results)
 
         if extraction.intent == UserIntent.QUERY_TASKS:

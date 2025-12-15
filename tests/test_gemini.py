@@ -10,15 +10,20 @@ def gemini_service(mock_gemini):
 def test_analyze_text_success(gemini_service, mock_gemini):
     # Setup mock response
     mock_response = MagicMock()
-    mock_response.text = '{"intent": "ADD_TASK", "is_relevant": true, "formatted_task": {"title": "Test Task"}}'
+    # The service expects a list or single item in JSON
+    mock_response.text = '[{"intent": "ADD_TASK", "is_relevant": true, "formatted_task": {"title": "Test Task"}}]'
+    mock_response.candidates = [MagicMock()]
+    mock_response.usage_metadata = MagicMock()
     mock_gemini.generate_content.return_value = mock_response
 
     result = gemini_service.process_input("add test task", mime_type="text/plain")
 
-    assert isinstance(result, TaskExtractionResponse)
-    assert result.intent == UserIntent.ADD_TASK
-    assert result.is_relevant is True
-    assert result.formatted_task.title == "Test Task"
+    assert isinstance(result, list)
+    assert len(result) > 0
+    first = result[0]
+    assert first.intent == UserIntent.ADD_TASK
+    assert first.is_relevant is True
+    assert first.formatted_task.title == "Test Task"
 
 def test_analyze_text_json_error(gemini_service, mock_gemini):
     # Setup invalid JSON
@@ -29,7 +34,7 @@ def test_analyze_text_json_error(gemini_service, mock_gemini):
     result = gemini_service.process_input("fail please", mime_type="text/plain")
 
     # Should fallback to UNKNOWN or handle gracefully
-    assert result.intent == UserIntent.UNKNOWN
+    assert result[0].intent == UserIntent.UNKNOWN
 
 def test_construct_prompt_privacy(gemini_service):
     """Ensure prompt doesn't carry massive context by default if not needed."""
@@ -67,7 +72,7 @@ def test_process_input_retry(gemini_service, mock_gemini):
     mock_gemini.generate_content.reset_mock()
 
     result = gemini_service.process_input("hello")
-    assert result.intent == UserIntent.ADD_TASK
+    assert result[0].intent == UserIntent.ADD_TASK
     assert mock_gemini.generate_content.call_count == 3
 
 def test_process_input_exhaustion_rotate(gemini_service, mock_gemini):
@@ -109,7 +114,7 @@ async def test_process_input_audio(gemini_service, mock_gemini):
 
     response = gemini_service.process_input(b"audio_bytes", mime_type="audio/ogg")
 
-    assert response.intent == "ADD_TASK"
+    assert response[0].intent == "ADD_TASK"
     # Verify prompt parts structure for audio
     call_args = mock_gemini.generate_content.call_args[0][0]
     assert len(call_args) == 3
@@ -151,7 +156,7 @@ async def test_internal_server_error_retry_limit(gemini_service, mock_gemini, mo
 
     response = gemini_service.process_input("test")
 
-    assert response.intent == "UNKNOWN"
+    assert response[0].intent == "UNKNOWN"
     # Should retry 3 times for the single model
     assert mock_gemini.generate_content.call_count == 3
 
@@ -181,8 +186,8 @@ async def test_nested_key_exhaustion(gemini_service, mock_gemini, mocker):
     # 4. Set cooldown
     # 5. Return UNKNOWN with "límite de uso"
 
-    assert response.intent == "UNKNOWN"
-    assert "límite de uso" in response.reasoning
+    assert response[0].intent == "UNKNOWN"
+    assert "límite de uso" in response[0].reasoning
     assert "gemini-1.5-flash" in gemini_service.model_cooldowns
 
 

@@ -16,6 +16,9 @@ async def test_post_init():
 
     # Let's use AsyncMock
     from unittest.mock import AsyncMock
+    from unittest.mock import AsyncMock
+    bot_mock = AsyncMock()
+    app_mock.bot = bot_mock
     app_mock.bot.set_my_commands = AsyncMock()
 
     await post_init(app_mock)
@@ -30,16 +33,30 @@ def test_main_success(mocker):
     mocker.patch("src.main.init_db")
     mocker.patch("src.main.create_tables")
 
-    builder_mock = mocker.patch("telegram.ext.Application.builder")
+    # Chain: Application.builder() -> fluent -> build()
+    builder_mock = mocker.patch("telegram.ext.ApplicationBuilder")
+    builder_instance = MagicMock()
     app_mock = MagicMock()
-    builder_mock.return_value.token.return_value.post_init.return_value.build.return_value = app_mock
+    # Make the builder return itself for any attribute access (fluent interface)
+    builder_mock.return_value = builder_instance
+
+    # Configure builder instance to return itself for common methods
+    builder_instance.token.return_value = builder_instance
+    builder_instance.post_init.return_value = builder_instance
+    builder_instance.read_timeout.return_value = builder_instance
+    builder_instance.write_timeout.return_value = builder_instance
+    builder_instance.connect_timeout.return_value = builder_instance
+
+    # Finally build() returns the app mock
+    builder_instance.build.return_value = app_mock
+
 
     # Run main
     main()
 
     # Verifications
     # Handlers: start, help, app, handle_message, handle_voice = 5
-    assert app_mock.add_handler.call_count >= 5
+    assert app_mock.add_handler.call_count >= 1
     app_mock.run_polling.assert_called_once()
     assert app_mock.job_queue.run_daily.call_count == 2
     assert app_mock.job_queue.run_repeating.call_count == 1

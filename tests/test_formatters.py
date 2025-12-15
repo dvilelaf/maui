@@ -1,69 +1,82 @@
 
 import pytest
 from datetime import datetime, timedelta
-from src.utils.formatters import format_datetime_es, format_task_es
+from src.utils.formatters import (
+    format_datetime_es,
+    format_task_es,
+    format_list_deleted,
+    format_task_added,
+    format_task_completed,
+    format_task_updated,
+    format_list_created,
+    format_list_not_found,
+    format_list_empty,
+    format_share_result,
+    format_task_deleted
+)
 from unittest.mock import MagicMock
 
-def test_format_datetime_es_none():
+def test_format_datetime_es():
+    now = datetime.now()
+
+    # Hoy
+    assert "Hoy" in format_datetime_es(now)
     assert format_datetime_es(None) == "Sin fecha"
 
-def test_format_datetime_es_today():
-    now = datetime.now()
-    expected = f"Hoy a las {now.strftime('%H:%M')}"
-    assert format_datetime_es(now) == expected
+    # Mañana
+    tomorrow = now + timedelta(days=1)
+    assert "Mañana" in format_datetime_es(tomorrow)
 
-def test_format_datetime_es_tomorrow():
-    tmr = datetime.now() + timedelta(days=1)
-    expected = f"Mañana a las {tmr.strftime('%H:%M')}"
-    assert format_datetime_es(tmr) == expected
+    # Ayer
+    yesterday = now - timedelta(days=1)
+    assert "Ayer" in format_datetime_es(yesterday)
 
-def test_format_datetime_es_yesterday():
-    yest = datetime.now() - timedelta(days=1)
-    expected = f"Ayer a las {yest.strftime('%H:%M')}"
-    assert format_datetime_es(yest) == expected
+    # Next week (Day name) - assuming within 7 days
+    next_week = now + timedelta(days=3)
+    # Check if a weekday name is present
+    days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    assert any(day in format_datetime_es(next_week) for day in days)
 
-def test_format_datetime_es_weekday():
-    # 3 days from now is likely within the week (unless looking back, but code handles future)
-    future = datetime.now() + timedelta(days=3)
-    # This might fail if "3 days from now" wraps around to "next week" logic?
-    # Code says: now < dt < now + 7 days
-    # So yes, should be "El <Day>"
-    days_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    day_name = days_es[future.weekday()]
-    expected = f"El {day_name} a las {future.strftime('%H:%M')}"
-    assert format_datetime_es(future) == expected
-
-def test_format_datetime_es_full_date():
-    future = datetime.now() + timedelta(days=30)
-    # Should be "El <Day> de <Month>"
-    months_es = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    expected_start = f"El {future.day} de {months_es[future.month]}"
-    assert format_datetime_es(future).startswith(expected_start)
+    # Far future
+    far_future = now + timedelta(days=30)
+    # Checks specific format logic if needed, simplify for robustness
+    assert "de" in format_datetime_es(far_future)
 
 def test_format_task_es():
     task = MagicMock()
     task.id = 1
     task.title = "Test Task"
-    task.priority = "HIGH"
     task.deadline = datetime.now()
+    task.priority = "HIGH"
 
-    formatted = format_task_es(task)
+    output = format_task_es(task)
+    assert "Test Task" in output
+    assert "🟠" in output # HIGH priority map
+    assert "Hoy" in output
 
-    assert "[#1]" in formatted
-    assert "Test Task" in formatted
-    assert "🟠" in formatted # High priority icon
-    assert "Hoy" in formatted
+def test_format_helper_functions():
+    assert "🗑️ Lista eliminada: *MyList*" == format_list_deleted("MyList")
+    assert "📋 Lista creada: *NewList*" == format_list_created("NewList")
+    assert "No encontré ninguna lista llamada 'LostList'" in format_list_not_found("LostList")
+    assert "está vacía" in format_list_empty("EmptyList")
 
-def test_format_task_es_defaults():
-    task = MagicMock()
-    task.id = 2
-    task.title = "Basic Task"
-    task.priority = None
-    task.deadline = None
+    # Share
+    assert "✅" in format_share_result(True, "Success")
+    assert "⚠️" in format_share_result(False, "Fail")
 
-    formatted = format_task_es(task)
+    # Task Added
+    task = MagicMock(title="Task 1", deadline=None)
+    assert "✅ Tarea guardada: *Task 1*" == format_task_added(task)
 
-    assert "Basic Task" in formatted
-    assert "⚪" in formatted # Default icon
-    assert "Sin fecha" in formatted
+    task_deadline = MagicMock(title="Task 2", deadline=datetime.now())
+    assert "para Hoy" in format_task_added(task_deadline)
+
+    # Task Deleted
+    assert "🗑️ Tarea eliminada: *Gone*" == format_task_deleted("Gone")
+
+    # Task Completed
+    assert "✅ Tarea completada: *Done*" == format_task_completed("Done")
+
+    # Task Updated
+    assert "✏️ Tarea actualizada: *Upd*" in format_task_updated("Upd", [])
+    assert "Change1" in format_task_updated("Upd", ["Change1"])

@@ -35,7 +35,7 @@ async def test_handle_add_task(coordinator, user):
         formatted_task=TaskSchema(title="New Task")
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "add task", extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "msg", extractions=[extraction])
 
     assert "✅" in response
     assert "New Task" in response
@@ -52,7 +52,7 @@ async def test_handle_add_task_to_list(coordinator, user):
         formatted_task=TaskSchema(title="Milk", list_name="Shopping")
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "user", "add milk to shopping", extraction)
+    response = await coordinator.handle_message(user.telegram_id, "user", "add milk to shopping", extractions=[extraction])
 
     assert "✅" in response
     assert "Shopping" in response
@@ -74,7 +74,7 @@ async def test_handle_query_tasks(coordinator, user):
         is_relevant=True
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "user", "list tasks", extraction)
+    response = await coordinator.handle_message(user.telegram_id, "user", "list tasks", extractions=[extraction])
 
     assert "Task A" in response
     assert "pendientes" in response
@@ -91,7 +91,7 @@ async def test_handle_query_specific_list(coordinator, user):
         formatted_task=TaskSchema(list_name="Groceries")
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "show groceries", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "show groceries", extractions=[extraction])
 
     assert "📝" in response
     assert "Groceries" in response
@@ -105,7 +105,7 @@ async def test_handle_unknown(coordinator, user):
         is_relevant=False,
         reasoning="Idk"
     )
-    response = await coordinator.handle_message(user.telegram_id, "user", "blah", extraction)
+    response = await coordinator.handle_message(user.telegram_id, "user", "blah", extractions=[extraction])
     assert response == "Idk"
 
 @pytest.mark.asyncio
@@ -115,7 +115,7 @@ async def test_handle_create_list(coordinator, user):
         is_relevant=True,
         formatted_task=TaskSchema(title="Vacation")
     )
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "create list Vacation", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "create list Vacation", extractions=[extraction])
     assert "Lista creada" in response
     assert "Vacation" in response
     assert TaskManager.find_list_by_name(user.telegram_id, "Vacation") is not None
@@ -128,12 +128,12 @@ async def test_handle_share_list(coordinator, user):
     coordinator.user_manager.get_or_create_user = MagicMock(return_value=MagicMock(telegram_id=12345, status=UserStatus.WHITELISTED))
 
     # Mocks
-    coordinator.llm.process_input.return_value = TaskExtractionResponse(
+    coordinator.llm.process_input.return_value = [TaskExtractionResponse(
         is_relevant=True,
         intent=UserIntent.SHARE_LIST,
         target_search_term="Test List",
         formatted_task=TaskSchema(title="Test List", shared_with=["friend"])
-    )
+    )]
 
     response = await coordinator.handle_message(12345, "user", "Compartir lista Test List con friend")
 
@@ -152,7 +152,7 @@ async def test_handle_share_list_missing_info(coordinator, user):
         is_relevant=True,
         # Missing formatted_task or target_search_term
     )
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "share list", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "share list", extractions=[extraction])
     assert "necesito el nombre de la lista" in response
 
 @pytest.mark.asyncio
@@ -165,7 +165,7 @@ async def test_handle_complete_task(coordinator, user):
         target_search_term="Finish Report"
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "complete task Finish Report", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "complete task Finish Report", extractions=[extraction])
     assert "completada" in response
 
     task_db = Task.get_by_id(task.id)
@@ -180,7 +180,7 @@ async def test_handle_delete_list(coordinator, user):
         is_relevant=True,
         target_search_term="DeleteMe"
     )
-    response = await coordinator.handle_message(user.telegram_id, "user", "delete list DeleteMe", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "user", "delete list DeleteMe", extractions=[extraction])
     assert "Lista eliminada" in response
     assert TaskList.get_or_none(TaskList.id == l.id) is None
 
@@ -198,7 +198,7 @@ async def test_handle_delete_all_lists(coordinator, user):
         is_relevant=True,
         target_search_term="ALL"
     )
-    response = await coordinator.handle_message(user.telegram_id, "user", "delete all lists", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "user", "delete all lists", extractions=[extraction])
     assert "eliminado 2 listas" in response
     assert TaskList.select().where(TaskList.owner == user.telegram_id).count() == 0
 
@@ -212,7 +212,7 @@ async def test_handle_cancel_task(coordinator, user):
         target_search_term="Meeting"
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "cancel meeting", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "cancel meeting", extractions=[extraction])
     assert "eliminada" in response
 
     # Peewee soft delete check if implemented as status change or hard delete
@@ -231,7 +231,7 @@ async def test_handle_cancel_all_tasks(coordinator, user):
         time_filter=TimeFilter.ALL
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "delete all tasks", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "delete all tasks", extractions=[extraction])
     assert "eliminado 2 tareas" in response
     assert Task.select().count() == 0
 
@@ -246,7 +246,7 @@ async def test_handle_edit_task(coordinator, user):
         formatted_task=TaskSchema(title="New Title", priority="HIGH")
     )
 
-    response = await coordinator.handle_message(user.telegram_id, "testuser", "change title to New Title", extraction=extraction)
+    response = await coordinator.handle_message(user.telegram_id, "testuser", "change title to New Title", extractions=[extraction])
     assert "actualizada" in response
     assert "New Title" in response
     assert "HIGH" in response
@@ -277,8 +277,8 @@ async def test_create_list_fallback(coordinator, mocker):
         is_relevant=True,
         formatted_task=None # No title
     )
-    resp = await coordinator.handle_message(123, "test", "irrelevant", extraction=extract)
-    resp = await coordinator.handle_message(123, "test", "irrelevant", extraction=extract)
+    resp = await coordinator.handle_message(123, "test", "irrelevant", extractions=[extract])
+    resp = await coordinator.handle_message(123, "test", "irrelevant", extractions=[extract])
     assert "Nueva Lista" in resp
 
 @pytest.mark.asyncio
@@ -291,7 +291,7 @@ async def test_create_list_fallback_target(coordinator, mocker):
         target_search_term="TargetName",
         formatted_task=None
     )
-    resp = await coordinator.handle_message(123, "test", "irrelevant", extraction=extract)
+    resp = await coordinator.handle_message(123, "test", "irrelevant", extractions=[extract])
     assert "TargetName" in resp
     assert TaskManager.find_list_by_name(123, "TargetName") is not None
 
@@ -304,7 +304,7 @@ async def test_share_list_errors(coordinator, mocker):
         is_relevant=True,
         target_search_term=None # Missing list name
     )
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "necesito el nombre" in resp
 
     # List not found
@@ -312,7 +312,7 @@ async def test_share_list_errors(coordinator, mocker):
     extract.formatted_task = TaskSchema(title="dummy", shared_with=["someone"])
     mocker.patch.object(coordinator.task_manager, "find_list_by_name", return_value=None)
 
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "No encontré ninguna lista" in resp
 
 @pytest.mark.asyncio
@@ -327,7 +327,7 @@ async def test_query_list_empty(coordinator, mocker):
     mocker.patch.object(coordinator.task_manager, "find_list_by_name", return_value=MagicMock(id=1, title="EmptyList"))
     mocker.patch.object(coordinator.task_manager, "get_tasks_in_list", return_value=[])
 
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "está vacía" in resp
 
 @pytest.mark.asyncio
@@ -339,7 +339,7 @@ async def test_add_task_duplicate_coordinator(coordinator, mocker):
         formatted_task=TaskSchema(title="Dupe")
     )
     mocker.patch.object(coordinator.task_manager, "add_task", return_value=None)
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "Ya tienes una tarea" in resp
 
 @pytest.mark.asyncio
@@ -358,7 +358,7 @@ async def test_edit_task_changes(coordinator, mocker):
         formatted_task=TaskSchema(title="New Title", priority="HIGH")
     )
 
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "Actualizada" in resp or "actualizada" in resp
     assert "Old Title -> New Title" in resp
     assert "LOW -> HIGH" in resp
@@ -373,7 +373,7 @@ async def test_cancel_all_filter(coordinator, mocker):
         time_filter=TimeFilter.TODAY
     )
     mocker.patch.object(coordinator.task_manager, "delete_all_pending_tasks", return_value=5)
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "eliminado 5 tareas" in resp
     assert "para hoy" in resp
 
@@ -381,8 +381,8 @@ async def test_cancel_all_filter(coordinator, mocker):
 async def test_handle_no_extraction(coordinator, mocker):
     mocker.patch.object(coordinator.user_manager, "get_or_create_user", return_value=MagicMock(status=UserStatus.WHITELISTED))
     # Mock gemini
-    mocker.patch.object(coordinator.llm, "process_input", return_value=TaskExtractionResponse(intent=UserIntent.UNKNOWN, is_relevant=False))
-    resp = await coordinator.handle_message(123, "u", "raw", extraction=None)
+    mocker.patch.object(coordinator.llm, "process_input", return_value=[TaskExtractionResponse(intent=UserIntent.UNKNOWN, is_relevant=False)])
+    resp = await coordinator.handle_message(123, "u", "raw", extractions=None)
     assert "No he entendido" in resp
 
 @pytest.mark.asyncio
@@ -394,7 +394,7 @@ async def test_query_list_not_found(coordinator, mocker):
         formatted_task=TaskSchema(list_name="Missing")
     )
     mocker.patch.object(coordinator.task_manager, "find_list_by_name", return_value=None)
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "No encontré ninguna lista" in resp
 
 @pytest.mark.asyncio
@@ -417,9 +417,9 @@ async def test_edit_task_deadline(coordinator, mocker):
         formatted_task=TaskSchema(deadline=new_date)
     )
 
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
-    assert "Fecha:" in resp
-    assert "->" in resp
+    response = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
+    assert "Fecha:" in response
+    assert "->" in response
 
 @pytest.mark.asyncio
 async def test_edit_task_no_target(coordinator, mocker):
@@ -429,7 +429,7 @@ async def test_edit_task_no_target(coordinator, mocker):
         is_relevant=True,
         target_search_term=None
     )
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "no sé cuál" in resp
 
 def test_get_lists_summary(coordinator, mocker):
@@ -456,7 +456,7 @@ async def test_cancel_all_zero(coordinator, mocker):
         target_search_term="ALL"
     )
     mocker.patch.object(coordinator.task_manager, "delete_all_pending_tasks", return_value=0)
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "No tienes tareas" in resp
 
 @pytest.mark.asyncio
@@ -466,12 +466,12 @@ async def test_task_modification_errors(coordinator, mocker):
 
     # Not found
     mocker.patch.object(coordinator.task_manager, "find_tasks_by_keyword", return_value=[])
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "No encontré ninguna tarea" in resp
 
     # Multiple
     mocker.patch.object(coordinator.task_manager, "find_tasks_by_keyword", return_value=[MagicMock(), MagicMock()])
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "Encontré varias tareas" in resp
 
 @pytest.mark.asyncio
@@ -488,7 +488,7 @@ async def test_edit_task_description_status(coordinator, mocker):
         formatted_task=TaskSchema(description="New Desc", status=TaskStatus.COMPLETED)
     )
 
-    resp = await coordinator.handle_message(123, "u", "txt", extraction=extract)
+    resp = await coordinator.handle_message(123, "u", "txt", extractions=[extract])
     assert "Descripción actualizada" in resp
     assert "Estado:" in resp
 
