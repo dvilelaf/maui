@@ -108,7 +108,7 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None
     deadline: Optional[str] = None
     recurrence: Optional[str] = None
-    list_id: Optional[int] = None # -1 or specific value? Or None means no change?
+    list_id: Optional[int] = None  # -1 or specific value? Or None means no change?
     # If we want to set "No List", frontend might send 0 or -1? Or null?
     # If list_id is Optional[int], sending null means None in python?
     # If we want to unassign, we probably need a way to say "Set to None".
@@ -152,11 +152,13 @@ async def update_task_content(
 ):
     # Check if there's anything to update
     # We now also check for recurrence
-    if (update.content is not None or
-        update.deadline is not None or
-        update.recurrence is not None or
-        update.list_id is not None or
-        "list_id" in update.model_fields_set):
+    if (
+        update.content is not None
+        or update.deadline is not None
+        or update.recurrence is not None
+        or update.list_id is not None
+        or "list_id" in update.model_fields_set
+    ):
         # We need to check if list_id was set even if it is None (to unassign)
 
         # We assume content (title) is the primary update, but others are optional.
@@ -183,7 +185,7 @@ async def update_task_content(
 
         # Standardize list_id -> task_list_id
         if "list_id" in update_dict:
-             update_dict["task_list_id"] = update_dict.pop("list_id")
+            update_dict["task_list_id"] = update_dict.pop("list_id")
 
         schema = TaskSchema(**update_dict)
 

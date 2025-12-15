@@ -1002,7 +1002,10 @@ window.editTask = editTask;
 window.deleteTask = deleteTask;
 window.respondInvite = respondInvite;
 
-function escapeAttr(str) { return str ? str.replace(/"/g, '&quot;') : ''; }
+function escapeAttr(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/"/g, '&quot;');
+}
 async function loadInvites() {
     const container = document.getElementById('invites-container');
     const invites = await apiRequest(`/invites`);
