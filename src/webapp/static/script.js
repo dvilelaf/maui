@@ -98,8 +98,10 @@ function switchTab(tab) {
     } else if (tab === 'all') {
         buttons[1].classList.add('active');
         document.getElementById('all-view').classList.add('active');
+        document.getElementById('all-view').classList.add('active');
         loadAllView();
     }
+    localStorage.setItem('activeTab', tab);
 }
 
 async function loadDatedView() {
@@ -921,7 +923,10 @@ function initApp(retries = 0) {
         }
 
         console.log("InitApp: Triggering dated view immediately");
-        switchTab('dated');
+
+        // Load saved tab or default
+        const savedTab = localStorage.getItem('activeTab') || 'dated';
+        switchTab(savedTab);
 
     } else {
         if (retries < 10) {
@@ -932,7 +937,8 @@ function initApp(retries = 0) {
             const fallbackId = urlParams.get('user_id');
             if (fallbackId) {
                 userId = fallbackId;
-                switchTab('dated');
+                const savedTab = localStorage.getItem('activeTab') || 'dated';
+                switchTab(savedTab);
             } else {
                 console.error("No userId found after retries");
                 document.getElementById('dated-container').innerHTML = '<div class="empty-state">Error: Usuario no identificado.</div>';
