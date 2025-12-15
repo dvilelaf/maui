@@ -67,7 +67,6 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
             & (Task.deadline > now)
             & (Task.deadline <= time_threshold)
             & (Task.reminder_sent == False)  # noqa: E712
-            & (Task.task_list.is_null())
         )
     )
 
@@ -77,14 +76,39 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
         if task.deadline.time() == time(0, 0, 0):
             continue
 
-        try:
-            await context.bot.send_message(
-                chat_id=task.user.telegram_id,
-                text=f"⏰ *Recordatorio*: ¡La tarea *{task.title}* vence pronto!\nFecha límite: {task.deadline}",
-                parse_mode="Markdown",
-            )
-            # Mark as sent
+        # Determine recipients
+        recipients = []
+        if task.task_list:
+            # Get all members of the list
+            try:
+                recipients = task_manager.get_list_members(task.task_list.id)
+            except Exception as e:
+                logger.error(
+                    f"Error fetching members for list {task.task_list.id}: {e}"
+                )
+                # Fallback to owner if list fetch fails, though task.user is arguably the owner/creator
+                recipients = [task.user]
+
+        else:
+            # Personal task
+            recipients = [task.user]
+
+        # Send to all recipients
+        notification_success = False
+        for user in recipients:
+            try:
+                await context.bot.send_message(
+                    chat_id=user.telegram_id,
+                    text=f"⏰ *Recordatorio*: ¡La tarea *{task.title}* vence pronto!\nFecha límite: {task.deadline}",
+                    parse_mode="Markdown",
+                )
+                notification_success = True
+            except Exception as e:
+                logger.error(f"Failed to send reminder for task {task.id} to user {user.telegram_id}: {e}")
+
+        # specific success check isn't strictly necessary for "at least one",
+        # but we mark as sent if we attempted. Best effort.
+        if notification_success or recipients:
+             # Mark as sent
             task.reminder_sent = True
             task.save()
-        except Exception as e:
-            logger.error(f"Failed to send reminder for task {task.id}: {e}")
