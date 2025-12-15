@@ -1,12 +1,13 @@
 :root {
     box-sizing: border-box;
-    --tg-theme-bg-color: #ffffff;
-    --tg-theme-text-color: #000000;
-    --tg-theme-hint-color: #999999;
-    --tg-theme-link-color: #2481cc;
-    --tg-theme-button-color: #2481cc;
-    --tg-theme-button-text-color: #ffffff;
-    --tg-theme-secondary-bg-color: #f0f0f0;
+    /* Enforce Light Mode: Hardcode values to ignore Telegram injection */
+    --tg-theme-bg-color: #ffffff !important;
+    --tg-theme-text-color: #000000 !important;
+    --tg-theme-hint-color: #999999 !important;
+    --tg-theme-link-color: #2481cc !important;
+    --tg-theme-button-color: #2481cc !important;
+    --tg-theme-button-text-color: #ffffff !important;
+    --tg-theme-secondary-bg-color: #f0f0f0 !important;
 
     --spacing-sm: 8px;
     --spacing-md: 16px;
