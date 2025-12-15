@@ -22,6 +22,11 @@ async def lifespan(app: FastAPI):
     db.connect()
     create_tables()
 
+    # Auto-migrate schema changes
+    from src.migrate_db import migrate
+
+    migrate()
+
     # Coordinator init (optional if lazy loaded, but good to check)
     # coordinator already init in state.py
 

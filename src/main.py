@@ -60,6 +60,10 @@ def main():
     # 1. Init Database
     init_db(Config.DATABASE_URL.replace("sqlite:///", ""))
     create_tables()
+    # Auto-migrate schema changes
+    from src.migrate_db import migrate
+
+    migrate()
 
     # 2. Setup Bot
     if not Config.TELEGRAM_TOKEN:

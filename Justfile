@@ -60,7 +60,14 @@ remote-db:
 
 # View Remote Logs (via SSH)
 remote-logs:
-    ssh -t $REMOTE_HOST "docker logs -f maui-telegram"
+    @if ! command -v tmux > /dev/null 2>&1; then \
+        echo "Error: 'tmux' is not installed. Please install it to use this command."; \
+        exit 1; \
+    fi
+    -tmux kill-session -t maui-logs 2> /dev/null || true
+    tmux new-session -d -s maui-logs "bash -c 'ssh -t $REMOTE_HOST \"docker logs -f maui-telegram\"; read -p \"Telegram logs exited. Press Enter...\"'"
+    tmux split-window -v -t maui-logs "bash -c 'ssh -t $REMOTE_HOST \"docker logs -f maui-webapp\"; read -p \"Webapp logs exited. Press Enter...\"'"
+    tmux attach-session -t maui-logs
 
 # Whitelist a user
 # Whitelist a user (ID, @username, or 'all')
