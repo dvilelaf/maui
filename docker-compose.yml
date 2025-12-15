@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     volumes:
       - ${VOLUME_PATH:-.}:/app/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
@@ -15,6 +17,7 @@ services:
       - WHITELISTED_USERS=${WHITELISTED_USERS}
       - WEBAPP_URL=${WEBAPP_URL}
       - ADMIN_USER=${ADMIN_USER}
+      - TZ=Europe/Madrid
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -26,6 +29,8 @@ services:
     command: uv run uvicorn src.webapp.app:app --host 0.0.0.0 --port 8123
     volumes:
       - ${VOLUME_PATH:-.}:/app/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     ports:
       - "${PORT:-8123}:8123"
     environment:
@@ -36,6 +41,7 @@ services:
       - GEMINI_API_KEYS=${GEMINI_API_KEYS}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TZ=Europe/Madrid
     depends_on:
       - maui-telegram
     dns:
