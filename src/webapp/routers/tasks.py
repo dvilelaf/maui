@@ -108,6 +108,15 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None
     deadline: Optional[str] = None
     recurrence: Optional[str] = None
+    list_id: Optional[int] = None # -1 or specific value? Or None means no change?
+    # If we want to set "No List", frontend might send 0 or -1? Or null?
+    # If list_id is Optional[int], sending null means None in python?
+    # If we want to unassign, we probably need a way to say "Set to None".
+    # Pydantic's exclude_unset helps. If frontend sends null, it is set to None.
+    # But None usually means "no change" in our logic below if we just iterate.
+    # Wait, update.model_dump(exclude_unset=True) excludes fields NOT sent.
+    # If frontend sends `list_id: null`, it IS set (to None).
+    # So we can use that to unassign.
     # user_id mixed in for backward compat if needed, but we prefer auth
     # user_id: int  <-- Removing this from strict requirement or ignoring it
 
@@ -143,7 +152,12 @@ async def update_task_content(
 ):
     # Check if there's anything to update
     # We now also check for recurrence
-    if update.content is not None or update.deadline is not None or update.recurrence is not None:
+    if (update.content is not None or
+        update.deadline is not None or
+        update.recurrence is not None or
+        update.list_id is not None or
+        "list_id" in update.model_fields_set):
+        # We need to check if list_id was set even if it is None (to unassign)
 
         # We assume content (title) is the primary update, but others are optional.
         schema_kwargs = {}
@@ -167,8 +181,9 @@ async def update_task_content(
         if "content" in update_dict:
             update_dict["title"] = update_dict.pop("content")
 
-        # TaskSchema expects keys matching its fields.
-        # We can pass **update_dict directly.
+        # Standardize list_id -> task_list_id
+        if "list_id" in update_dict:
+             update_dict["task_list_id"] = update_dict.pop("list_id")
 
         schema = TaskSchema(**update_dict)
 

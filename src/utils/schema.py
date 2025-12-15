@@ -66,6 +66,9 @@ class TaskSchema(BaseModel):
     list_name: Optional[str] = Field(
         None, description="Name of the list to add this task to, if specified."
     )
+    task_list_id: Optional[int] = Field(
+        None, description="The ID of the list to add this task to, if specified."
+    )
     shared_with: Optional[list[str]] = Field(
         None, description="List of usernames (@user) to share with."
     )

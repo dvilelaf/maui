@@ -401,11 +401,11 @@ async function toggleListMixed(listId, headerElement) {
 
 // --- Add/Edit Task Modal Logic ---
 
-function openTaskModal(taskId = null, listId = null, initialData = {}) {
+async function openTaskModal(taskId = null, listId = null, initialData = {}) {
     const modal = document.getElementById('add-task-modal');
     const titleEl = document.getElementById('task-modal-title');
     const taskIdInput = document.getElementById('new-task-id');
-    const listIdInput = document.getElementById('new-task-list-id');
+    const listSelect = document.getElementById('new-task-list-select');
 
     // Reset fields
     document.getElementById('new-task-title').value = '';
@@ -415,7 +415,32 @@ function openTaskModal(taskId = null, listId = null, initialData = {}) {
     dateInput.type = 'text';
 
     taskIdInput.value = taskId || '';
-    listIdInput.value = listId || '';
+
+    // Populate Lists Dropdown
+    listSelect.innerHTML = '<option value="">Ninguna</option>';
+    try {
+        const lists = await apiRequest('/lists'); // Assume this endpoint exists and returns {id, title...}
+        if (lists && lists.length > 0) {
+            lists.forEach(l => {
+                const opt = document.createElement('option');
+                opt.value = l.id;
+                opt.textContent = l.name; // Use 'name' from ListResponse
+                listSelect.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        console.warn("Failed to load lists for dropdown", e);
+    }
+
+    // Set Initial List Selection
+    // Priority: initialData.list_id (Edit) > listId (Add from List) > "" (Add Global)
+    let selectedListId = "";
+    if (taskId && initialData.list_id !== undefined) {
+        selectedListId = initialData.list_id || "";
+    } else if (listId) {
+        selectedListId = listId;
+    }
+    listSelect.value = selectedListId;
 
     if (taskId) {
         // Edit Mode
@@ -423,9 +448,6 @@ function openTaskModal(taskId = null, listId = null, initialData = {}) {
         document.getElementById('new-task-title').value = initialData.content || '';
         document.getElementById('new-task-recurrence').value = initialData.recurrence || '';
         if (initialData.deadline) {
-            // Assume deadline format yyyy-MM-dd is usable by date input OR needs formatting
-            // API returns string usually. Input type=date expects yyyy-mm-dd
-            // If it contains T00:00:00, strip it
             dateInput.value = initialData.deadline.split('T')[0];
             dateInput.type = 'date';
         }
@@ -457,27 +479,29 @@ async function submitNewTask() {
     const taskId = document.getElementById('new-task-id').value;
     const recurrence = document.getElementById('new-task-recurrence').value;
     let deadline = document.getElementById('new-task-date').value;
-    const listId = document.getElementById('new-task-list-id').value;
+    const listSelect = document.getElementById('new-task-list-select');
+    const selectedListId = listSelect.value;
+
+    // Convert "" to null for API
+    const listIdToSave = selectedListId ? parseInt(selectedListId) : null;
 
     const payload = {
         content: title,
-        recurrence: recurrence || "", // Send empty string to clear if supported, or null
-        deadline: deadline || "",     // Send empty string to clear
-        list_id: listId ? parseInt(listId) : null
+        recurrence: recurrence || "",
+        deadline: deadline || "",
+        list_id: listIdToSave
     };
 
     closeAddTaskModal();
 
     try {
         if (taskId) {
-            // Update Existing (recurrence support added to API)
-            // Make sure payload keys match TaskUpdate. list_id updates not supported here yet?
-            // TaskUpdate: content, status, deadline, recurrence
-            // We strip list_id for update if not needed or supported.
+            // Update Existing
             await apiRequest(`/tasks/${taskId}/update`, 'POST', {
                 content: payload.content,
                 deadline: payload.deadline,
-                recurrence: payload.recurrence
+                recurrence: payload.recurrence,
+                list_id: payload.list_id
             });
         } else {
             // Create New
@@ -485,6 +509,10 @@ async function submitNewTask() {
         }
 
         tg.HapticFeedback.notificationOccurred('success');
+
+        // Full Refresh needed to show task in new list or remove from old
+        // refreshCurrentView might be checking active tab.
+        // If we moved a task, it's safer to reload the view completely.
         refreshCurrentView();
 
     } catch (e) {
@@ -537,11 +565,13 @@ async function editTask(taskId, btnElement) {
     const currentContent = btnElement.getAttribute('data-content');
     const currentDeadline = btnElement.getAttribute('data-deadline') || '';
     const currentRecurrence = btnElement.getAttribute('data-recurrence') || '';
+    const currentListId = btnElement.getAttribute('data-list-id');
 
     openTaskModal(taskId, null, {
         content: currentContent,
         deadline: currentDeadline,
-        recurrence: currentRecurrence
+        recurrence: currentRecurrence,
+        list_id: currentListId ? parseInt(currentListId) : null
     });
 }
 
@@ -916,6 +946,7 @@ function getTaskInnerHtml(task) {
     const deadline = task.deadline || "";
     const recurrence = task.recurrence || "";
 
+
     // Recurrence Icon Indicator if set
     let recurrenceIcon = "";
     if (recurrence && recurrence !== "None") {
@@ -923,7 +954,7 @@ function getTaskInnerHtml(task) {
     }
 
     return `
-        <div class="checkbox ${isCompleted ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
+        <div class="task-checkbox ${isCompleted ? 'checked' : ''}" onclick="toggleTask(${task.id}, '${task.status}'); event.stopPropagation();"></div>
         <div class="task-content">
             <span class="${isCompleted ? 'completed-text' : ''}">${task.content} ${recurrenceIcon}</span>
             ${task.deadline ? `<span class="deadline-text">${formatDeadline(task.deadline)}</span>` : ''}
@@ -932,6 +963,7 @@ function getTaskInnerHtml(task) {
             data-content="${escapedContent}"
             data-deadline="${deadline}"
             data-recurrence="${recurrence}"
+            data-list-id="${task.list_id || ''}"
             onclick="editTask(${task.id}, this); event.stopPropagation();">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
