@@ -325,9 +325,17 @@ function renderListTasks(listId, tasks) {
     const body = document.getElementById(`list-body-${listId}`);
     if (!body) return;
 
+    // Sort: Pending first, Completed last
+    const sortedTasks = [...tasks].sort((a, b) => {
+        const isA = a.status === 'COMPLETED';
+        const isB = b.status === 'COMPLETED';
+        if (isA === isB) return 0; // Keep original order
+        return isA ? 1 : -1;
+    });
+
     body.innerHTML = `
         <div class="list-tasks" style="display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0;">
-            ${tasks.map(t => {
+            ${sortedTasks.map(t => {
         return `
                 <div class="task-item small ${t.status === 'COMPLETED' ? 'completed' : ''}" style="width: 100%; margin: 0; border: none; background: rgba(255,255,255,0.6); box-shadow: none; border-radius: 8px;">
                     ${getTaskInnerHtml(t)}
