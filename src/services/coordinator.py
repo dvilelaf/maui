@@ -403,7 +403,7 @@ class Coordinator:
         """Returns a formatted list of lists."""
         lists = self.task_manager.get_lists(user_id)
         if not lists:
-            pass # Continue to show empty list hint at the end
+            pass  # Continue to show empty list hint at the end
 
         summary = "*Tus Listas:*\n\n"
         for task_list in lists:

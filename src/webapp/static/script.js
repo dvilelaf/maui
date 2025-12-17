@@ -583,13 +583,20 @@ async function editTask(taskId, btnElement) {
 // try { ... }
 
 async function deleteTask(taskId, isFromList = false) {
-    if (!confirm('¿Eliminar tarea?')) return;
-    try {
-        await apiRequest(`/tasks/${taskId}/delete`, 'POST'); // Auth header handles user identification
-        refreshCurrentView();
-    } catch (e) {
-        console.error(e);
-        alert("Error al eliminar tarea: " + e.message);
+    const message = '¿Deseas eliminar definitivamente esta tarea?';
+    const confirmed = await showModal('Eliminar Tarea', message);
+
+    if (confirmed === true || (typeof confirmed === 'string' && confirmed !== 'null')) {
+        try {
+            await apiRequest(`/tasks/${taskId}/delete`, 'POST');
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+            refreshCurrentView();
+        } catch (e) {
+            console.error(`[deleteTask] FAILED:`, e);
+            alert("Error al eliminar la tarea. Intenta de nuevo.");
+        }
     }
 }
 
@@ -614,13 +621,19 @@ async function addTaskToList(listId) {
 // if (!await showModal('Borrar Lista', ...)) return;
 
 async function deleteList(listId) {
-    if (!confirm('¿Seguro que quieres eliminar esta lista?')) return;
-    try {
-        await apiRequest(`/lists/${listId}/delete`, 'POST');
-        refreshCurrentView();
-    } catch (e) {
-        console.error(e);
-        alert("Error al eliminar lista: " + e.message);
+    const message = '¿Seguro que quieres eliminar esta lista y todas sus tareas?';
+
+    if (await showModal('Eliminar Lista', message)) {
+        try {
+            await apiRequest(`/lists/${listId}/delete`, 'POST');
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+            refreshCurrentView();
+        } catch (e) {
+            console.error(`[deleteList] Failed:`, e);
+            alert("Error al eliminar lista.");
+        }
     }
 }
 
@@ -914,6 +927,7 @@ function showModal(title, message, hasInput = false, initialValue = '', hasDate 
 
         document.getElementById('custom-modal').style.display = 'flex';
         document.getElementById('custom-modal').dataset.hasDate = hasDate;
+        document.getElementById('custom-modal').dataset.hasInput = hasInput;
 
         modalResolver = resolve;
         if (hasInput) setTimeout(() => input.focus(), 100);
@@ -924,17 +938,23 @@ function closeModal(result) {
     const modal = document.getElementById('custom-modal');
     const input = document.getElementById('modal-input');
     const dateInput = document.getElementById('modal-date');
-    const hasDate = modal.dataset.hasDate === 'true'; // string comparison because dataset is string
+    const hasDate = modal.dataset.hasDate === 'true';
+    const hasInput = modal.dataset.hasInput === 'true';
 
     modal.style.display = 'none';
     if (modalResolver) {
-        if (result && hasDate) {
+        if (!result) {
+            modalResolver(null);
+        } else if (hasDate) {
             modalResolver({
                 content: input.value,
                 deadline: dateInput.value || null
             });
+        } else if (hasInput) {
+            modalResolver(input.value);
         } else {
-            modalResolver(result ? input.value : null);
+            // Simple confirmation
+            modalResolver(true);
         }
     }
     modalResolver = null;
@@ -973,7 +993,7 @@ function getTaskInnerHtml(task) {
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
             </svg>
         </button>
-        <button class="icon-btn delete-btn" onclick="deleteTask(${task.id}); event.stopPropagation();">
+        <button type="button" class="icon-btn delete-btn" onclick="window.deleteTask(${task.id}); event.stopPropagation();">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 6h18"></path>
                 <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>

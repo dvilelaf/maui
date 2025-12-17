@@ -59,10 +59,6 @@ async def get_current_user(
     FastAPI Dependency to get the authenticated user ID.
     Raises 401 if invalid.
     """
-    # Bypass for local dev if configured (Optional, strict for now)
-    # If using direct URL without Telegram context, init_data might be missing.
-    # For now, we enforce it to fix the security issue.
-
     if not x_telegram_init_data:
         # Development fallback only if absolutely needed, but better to fail secure.
         # If user visits via browser without Telegram, they can't authenticate.

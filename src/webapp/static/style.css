@@ -358,19 +358,21 @@ textarea {
     background: none;
     border: none;
     color: #ff3b30;
-    opacity: 0;
-    transition: opacity 0.2s;
-    transition: opacity 0.2s;
+    opacity: 0.9 !important;
+    /* High visibility */
     cursor: pointer;
     padding: 0;
-    width: 32px;
-    /* Fixed size */
-    height: 32px;
-    min-width: 32px;
+    width: 44px;
+    /* Apple minimum touch target */
+    height: 44px;
+    min-width: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    pointer-events: auto !important;
+    z-index: 10;
+    /* Ensure on top */
 }
 
 .delete-btn svg,
@@ -379,16 +381,18 @@ textarea {
     height: 24px !important;
     min-width: 24px !important;
     flex-shrink: 0 !important;
+    pointer-events: none !important;
+    /* Ensure click goes to button */
 }
 
 .task-item:hover .delete-btn {
-    opacity: 1;
+    opacity: 1 !important;
 }
 
-/* Ensure visible on touch if no hover */
+/* Ensure fully visible on touch */
 @media (hover: none) {
     .delete-btn {
-        opacity: 0.5;
+        opacity: 0.8 !important;
     }
 }
 
@@ -423,18 +427,17 @@ textarea {
     border: none;
     cursor: pointer;
     padding: 0;
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    /* Prevent squash */
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    /* Circle hover effect */
-    opacity: 0.7;
+    opacity: 0.8;
     transition: opacity 0.2s, background-color 0.2s;
     flex-shrink: 0;
+    pointer-events: auto !important;
 }
 
 .icon-btn:hover {

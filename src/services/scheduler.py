@@ -104,11 +104,13 @@ async def check_deadlines_job(context: ContextTypes.DEFAULT_TYPE):
                 )
                 notification_success = True
             except Exception as e:
-                logger.error(f"Failed to send reminder for task {task.id} to user {user.telegram_id}: {e}")
+                logger.error(
+                    f"Failed to send reminder for task {task.id} to user {user.telegram_id}: {e}"
+                )
 
         # specific success check isn't strictly necessary for "at least one",
         # but we mark as sent if at least one succeeded.
         if notification_success:
-             # Mark as sent
+            # Mark as sent
             task.reminder_sent = True
             task.save()
