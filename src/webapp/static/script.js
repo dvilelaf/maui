@@ -285,7 +285,7 @@ async function createDashboardElement(item) {
             <div class="list-header" onclick="toggleListMixed(${list.id}, this)">
                 <div class="list-header-content">
                     <svg class="list-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    <div><strong>${list.title}</strong> <small>(${list.task_count})</small></div>
+                    <div><strong>${list.title}</strong> ${list.task_count > 0 ? `<small>(${list.task_count})</small>` : ''}</div>
                 </div>
                 <div class="list-actions" style="display:flex; align-items:center; gap:4px;">
                      <button class="icon-btn edit-btn" data-name="${escapeAttr(list.title)}" onclick="editList(${list.id}, this); event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
@@ -1064,9 +1064,14 @@ async function respondInvite(listId, accept) {
 // Ensure everything is loaded
 // Safe Init
 function initApp(retries = 0) {
+    // Try to get tg if missing
+    if (!tg && window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
+    }
+
     // Try to get userId if missing
     if (!userId) {
-        userId = tg.initDataUnsafe?.user?.id;
+        userId = tg?.initDataUnsafe?.user?.id;
         if (!userId) {
             const urlParams = new URLSearchParams(window.location.search);
             userId = urlParams.get('user_id');

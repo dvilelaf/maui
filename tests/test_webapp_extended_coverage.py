@@ -63,7 +63,7 @@ def test_dashboard_route(client):
         list_data.title = "List"
         list_data.color = "red"
         # Mock tasks.count()
-        list_data.tasks.count.return_value = 5
+        list_data.tasks.where.return_value.count.return_value = 5
 
         # Items structure: type, data, position, created_at
         from datetime import datetime

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from src.webapp.state import coordinator
 from src.webapp.routers.tasks import TaskResponse
 from src.webapp.auth import get_current_user
+from src.utils.schema import TaskStatus
 
 router = APIRouter(prefix="/api/lists", tags=["lists"])
 
@@ -50,7 +51,9 @@ async def get_lists(user_id: int = Depends(get_current_user)):
                 id=lst.id,
                 name=lst.title,
                 owner_id=lst.owner_id,
-                task_count=len(tasks_in_list),
+                task_count=len(
+                    [t for t in tasks_in_list if t.status == TaskStatus.PENDING]
+                ),
                 color=lst.color or "#f2f2f2",
                 tasks=task_responses,
             )

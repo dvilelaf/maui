@@ -440,13 +440,24 @@ def test_get_lists_summary(coordinator, mocker):
 
     # With lists
     l1 = MagicMock(title="L1", owner=MagicMock(telegram_id=123))
-    l1.tasks.count.return_value = 5
+    l1.tasks.where.return_value.count.return_value = 5
     mocker.patch.object(coordinator.task_manager, "get_lists", return_value=[l1])
 
     resp = coordinator.get_lists_summary(123)
     assert "L1" in resp
     assert "5 elementos" in resp
     assert "Propietario" in resp
+
+def test_get_lists_summary_zero_count(coordinator, mocker):
+    mocker.patch.object(coordinator.user_manager, "get_or_create_user", return_value=MagicMock(status=UserStatus.WHITELISTED))
+    l1 = MagicMock(title="L1", owner=MagicMock(telegram_id=123))
+    l1.tasks.where.return_value.count.return_value = 0
+    mocker.patch.object(coordinator.task_manager, "get_lists", return_value=[l1])
+
+    resp = coordinator.get_lists_summary(123)
+    assert "L1" in resp
+    assert "0 elementos" not in resp # Should be hidden
+    assert "(elementos)" not in resp
 
 @pytest.mark.asyncio
 async def test_handle_edit_task_with_list_scope(coordinator, mocker):

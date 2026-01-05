@@ -10,7 +10,7 @@ def deploy():
     # In justfile we use 'set dotenv-load', so they should be available.
 
     url = os.getenv("PORTAINER_URL")
-    token = os.getenv("PORTAINER_API_TOKEN")
+    token = os.getenv("PORTAINER_API_TOKEN_ROBALEIRA")
     stack_id = os.getenv("STACK_ID")
     endpoint_id = os.getenv("ENDPOINT_ID", "1")  # Default to 1
 

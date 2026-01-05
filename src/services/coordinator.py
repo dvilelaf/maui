@@ -4,6 +4,7 @@ from src.services.llm_provider import LLMFactory
 from src.database.repositories.task_repository import TaskManager
 from src.database.repositories.user_repository import UserManager
 import logging
+from src.database.models import Task
 from src.utils.schema import (
     UserIntent,
     TimeFilter,
@@ -411,10 +412,9 @@ class Coordinator:
             is_owner = task_list.owner.telegram_id == user_id
             role = "👑 Propietario" if is_owner else "👥 Compartida"
 
-            # Item count
-            count = task_list.tasks.count()
-
-            summary += f"• *{task_list.title}* ({count} elementos) | {role}\n"
+            count = task_list.tasks.where(Task.status == TaskStatus.PENDING).count()
+            count_str = f" ({count} elementos)" if count > 0 else ""
+            summary += f"• *{task_list.title}*{count_str} | {role}\n"
 
             # Show top 5 tasks or all? User asked for "perfectly all".
             tasks = task_list.tasks

@@ -101,7 +101,7 @@ def test_get_lists_summary_status_icon():
     mock_list = MagicMock()
     mock_list.owner.telegram_id = 1
     mock_list.title = "L"
-    mock_list.tasks.count.return_value = 1
+    mock_list.tasks.where.return_value.count.return_value = 1
 
     t1 = MagicMock()
     t1.status = "COMPLETED"

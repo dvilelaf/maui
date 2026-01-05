@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from datetime import datetime
 from src.webapp.state import coordinator
 from src.webapp.auth import get_current_user
+from src.database.models import Task
+from src.utils.schema import TaskStatus
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -81,7 +83,9 @@ async def get_all_items(user_id: int = Depends(get_current_user)):
             obj["color"] = data.color
             # Owner? Task count?
             # kept simple for dashboard view
-            obj["task_count"] = data.tasks.count()
+            obj["task_count"] = data.tasks.where(
+                Task.status == TaskStatus.PENDING
+            ).count()
 
         serialized.append(obj)
 
